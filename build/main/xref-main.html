@@ -275,7 +275,8 @@ imports:
 imported by:
     <a href="#PyQt5.QtGui">PyQt5.QtGui</a>
  &#8226;   <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
- &#8226;   <a href="#ui.main_window">ui.main_window</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
+ &#8226;   <a href="#ui.user_table_widget">ui.user_table_widget</a>
 
   </div>
 
@@ -292,6 +293,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
 
   </div>
 
@@ -311,6 +313,8 @@ imported by:
     <a href="#main.py">main.py</a>
  &#8226;   <a href="#ui.config_dialog">ui.config_dialog</a>
  &#8226;   <a href="#ui.main_window">ui.main_window</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
+ &#8226;   <a href="#ui.user_table_widget">ui.user_table_widget</a>
 
   </div>
 
@@ -5101,6 +5105,7 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
+ &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -5233,7 +5238,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib.abc">importlib.abc</a>
+    <a href="#importlib">importlib</a>
+ &#8226;   <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#pkgutil">pkgutil</a>
  &#8226;   <a href="#py_compile">py_compile</a>
@@ -6681,7 +6687,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#ui.config_dialog">ui.config_dialog</a>
- &#8226;   <a href="#ui.main_window">ui.main_window</a>
+ &#8226;   <a href="#ui.presenter">ui.presenter</a>
 
   </div>
 
@@ -6702,7 +6708,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#ui.main_window">ui.main_window</a>
+    <a href="#ui.presenter">ui.presenter</a>
 
   </div>
 
@@ -7259,7 +7265,6 @@ imported by:
  &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#py_compile">py_compile</a>
  &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#ui.main_window">ui.main_window</a>
  &#8226;   <a href="#warnings">warnings</a>
 
   </div>
@@ -7368,7 +7373,10 @@ imported by:
 imported by:
     <a href="#ui.config_dialog">ui.config_dialog</a>
  &#8226;   <a href="#ui.main_window">ui.main_window</a>
+ &#8226;   <a href="#ui.presenter">ui.presenter</a>
  &#8226;   <a href="#ui.style_loader">ui.style_loader</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
+ &#8226;   <a href="#ui.user_table_widget">ui.user_table_widget</a>
 
   </div>
 
@@ -7398,19 +7406,36 @@ imported by:
   <a target="code" href="///C:/Users/wjddn/OneDrive/Desktop/team_builder/ui/main_window.py" type="text/plain"><tt>ui.main_window</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#PyQt5.QtCore">PyQt5.QtCore</a>
- &#8226;   <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
- &#8226;   <a href="#service.dataset_service">service.dataset_service</a>
- &#8226;   <a href="#service.team_builder">service.team_builder</a>
- &#8226;   <a href="#traceback">traceback</a>
+    <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
  &#8226;   <a href="#ui">ui</a>
  &#8226;   <a href="#ui.config_dialog">ui.config_dialog</a>
+ &#8226;   <a href="#ui.presenter">ui.presenter</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
+ &#8226;   <a href="#ui.user_table_widget">ui.user_table_widget</a>
  &#8226;   <a href="#util.constants">util.constants</a>
 
   </div>
   <div class="import">
 imported by:
     <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="ui.presenter"></a>
+  <a target="code" href="///C:/Users/wjddn/OneDrive/Desktop/team_builder/ui/presenter.py" type="text/plain"><tt>ui.presenter</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#service.dataset_service">service.dataset_service</a>
+ &#8226;   <a href="#service.team_builder">service.team_builder</a>
+ &#8226;   <a href="#ui">ui</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#ui.main_window">ui.main_window</a>
 
   </div>
 
@@ -7429,6 +7454,45 @@ imports:
   <div class="import">
 imported by:
     <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="ui.team_result_widget"></a>
+  <a target="code" href="///C:/Users/wjddn/OneDrive/Desktop/team_builder/ui/team_result_widget.py" type="text/plain"><tt>ui.team_result_widget</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PyQt5.QtCore">PyQt5.QtCore</a>
+ &#8226;   <a href="#PyQt5.QtGui">PyQt5.QtGui</a>
+ &#8226;   <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
+ &#8226;   <a href="#ui">ui</a>
+ &#8226;   <a href="#util.constants">util.constants</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#ui.main_window">ui.main_window</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="ui.user_table_widget"></a>
+  <a target="code" href="///C:/Users/wjddn/OneDrive/Desktop/team_builder/ui/user_table_widget.py" type="text/plain"><tt>ui.user_table_widget</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PyQt5.QtCore">PyQt5.QtCore</a>
+ &#8226;   <a href="#PyQt5.QtWidgets">PyQt5.QtWidgets</a>
+ &#8226;   <a href="#ui">ui</a>
+ &#8226;   <a href="#util.constants">util.constants</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#ui.main_window">ui.main_window</a>
 
   </div>
 
@@ -7510,6 +7574,8 @@ imported by:
  &#8226;   <a href="#service.team_builder">service.team_builder</a>
  &#8226;   <a href="#ui.config_dialog">ui.config_dialog</a>
  &#8226;   <a href="#ui.main_window">ui.main_window</a>
+ &#8226;   <a href="#ui.team_result_widget">ui.team_result_widget</a>
+ &#8226;   <a href="#ui.user_table_widget">ui.user_table_widget</a>
 
   </div>
 
