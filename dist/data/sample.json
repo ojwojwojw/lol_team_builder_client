@@ -1,0 +1,123 @@
+[
+  {
+    "selected": true,
+    "name": "오정원",
+    "tier": "실버",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "미드",
+      "정글"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "이은경",
+    "tier": "아이언",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "서폿",
+      "정글"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "윤예지",
+    "tier": "아이언",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "원딜",
+      "서폿"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "오연주",
+    "tier": "브론즈",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "탑",
+      "서폿"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "전종헌",
+    "tier": "골드",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "정글",
+      "미드"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "김현준",
+    "tier": "플래티넘",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "미드",
+      "탑"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "수달",
+    "tier": "아이언",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "서폿",
+      "탑"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "남수달",
+    "tier": "골드",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "탑",
+      "서폿"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "게스트1",
+    "tier": "실버",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "원딜",
+      "정글"
+    ]
+  },
+  {
+    "selected": true,
+    "name": "게스트2",
+    "tier": "실버",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "탑",
+      "미드"
+    ]
+  },
+  {
+    "selected": false,
+    "name": "게스트3",
+    "tier": "다이아",
+    "tier_detail": 1,
+    "positions": [
+      "1",
+      "미드",
+      "원딜"
+    ]
+  }
+]
