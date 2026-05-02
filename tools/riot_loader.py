@@ -1,5 +1,6 @@
 import sys
 from pprint import pformat
+from pathlib import Path
 
 import requests
 from PyQt5.QtWidgets import (
@@ -12,6 +13,10 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from service.dataset_service import load_server_base_url
 
