@@ -1,22 +1,22 @@
 QWidget {
-    background-color: #121212;
-    color: #e0e0e0;
+    background-color: #f5f7fb;
+    color: #1f2933;
     font-size: 13px;
 }
 
 QPushButton {
-    background-color: #2a2a2a;
-    border: 1px solid #3a3a3a;
+    background-color: #ffffff;
+    border: 1px solid #cfd8e3;
     padding: 6px 10px;
     border-radius: 6px;
 }
 
 QPushButton:hover {
-    background-color: #3a3a3a;
+    background-color: #eef4fb;
 }
 
 QPushButton:pressed {
-    background-color: #444444;
+    background-color: #dde9f7;
 }
 
 QLineEdit,
@@ -25,21 +25,21 @@ QSpinBox,
 QTextEdit,
 QListWidget,
 QTableWidget {
-    background-color: #1e1e1e;
-    border: 1px solid #333333;
+    background-color: #ffffff;
+    border: 1px solid #cfd8e3;
     border-radius: 6px;
     padding: 4px;
 }
 
 QHeaderView::section {
-    background-color: #2a2a2a;
+    background-color: #eef3f8;
     padding: 6px;
-    border: 1px solid #333333;
+    border: 1px solid #d6dee8;
     font-weight: bold;
 }
 
 QGroupBox {
-    border: 1px solid #333333;
+    border: 1px solid #d6dee8;
     border-radius: 8px;
     margin-top: 8px;
     padding-top: 10px;
@@ -53,10 +53,10 @@ QGroupBox::title {
 }
 
 QTableWidget {
-    gridline-color: #333333;
+    gridline-color: #d6dee8;
 }
 
 QListWidget::item:selected,
 QTableWidget::item:selected {
-    background-color: #35516b;
+    background-color: #dcecff;
 }

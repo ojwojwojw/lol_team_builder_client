@@ -76,6 +76,24 @@ class MatchReadQuery:
         )
         return self._fetch_dicts()
 
+    def list_accounts(self, limit: int) -> list[dict]:
+        """Return stored riot_account rows ordered by latest fetch time."""
+        self.cursor.execute(
+            """
+            SELECT
+                puuid,
+                game_name,
+                tag_line,
+                fetched_at,
+                raw_json
+            FROM riot_account
+            ORDER BY fetched_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return self._fetch_dicts()
+
     def search_accounts_by_game_name(self, keyword: str, limit: int) -> list[dict]:
         """Return riot_account rows using a LIKE search on game_name."""
         self.cursor.execute(

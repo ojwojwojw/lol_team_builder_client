@@ -1,4 +1,4 @@
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor
 from PyQt5.QtWidgets import (
     QAbstractItemView,
@@ -12,19 +12,23 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from service.team_builder import calc_position_fit_bonus, calc_recent_form_bonus
-from util.constants import POSITIONS, TIER_COLOR
+from domain.constants import DEFAULT_THEME_MODE, POSITIONS
+from domain.team_builder import calc_position_fit_bonus, calc_recent_form_bonus
+from ui.theme import TIER_COLOR, get_theme_tokens
 
 
 class TeamResultWidget(QWidget):
     generate_clicked = pyqtSignal()
     copy_clicked = pyqtSignal()
+    account_clicked = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
         self.result_text = ""
+        self.theme_mode = DEFAULT_THEME_MODE
         self._create_ui()
         self._connect_signals()
+        self.apply_theme(self.theme_mode)
 
     def _create_ui(self):
         layout = QVBoxLayout()
@@ -40,18 +44,12 @@ class TeamResultWidget(QWidget):
 
         team1_container = QVBoxLayout()
         self.team1_score_label = QLabel("팀 1 점수: -")
-        self.team1_score_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #E74C3C;"
-        )
         self.team1_table = self._create_team_table()
         team1_container.addWidget(self.team1_score_label)
         team1_container.addWidget(self.team1_table)
 
         team2_container = QVBoxLayout()
         self.team2_score_label = QLabel("팀 2 점수: -")
-        self.team2_score_label.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #3498DB;"
-        )
         self.team2_table = self._create_team_table()
         team2_container.addWidget(self.team2_score_label)
         team2_container.addWidget(self.team2_table)
@@ -61,9 +59,6 @@ class TeamResultWidget(QWidget):
         layout.addLayout(teams_layout)
 
         self.diff_label = QLabel("점수 차이: -")
-        self.diff_label.setStyleSheet(
-            "font-size: 14px; font-weight: bold; color: #1E90FF;"
-        )
         layout.addWidget(self.diff_label)
 
         self.setLayout(layout)
@@ -71,6 +66,25 @@ class TeamResultWidget(QWidget):
     def _connect_signals(self):
         self.generate_btn.clicked.connect(self.generate_clicked.emit)
         self.copy_btn.clicked.connect(self.copy_clicked.emit)
+        self.team1_table.cellClicked.connect(
+            lambda row, _col: self._emit_account_click(self.team1_table, row)
+        )
+        self.team2_table.cellClicked.connect(
+            lambda row, _col: self._emit_account_click(self.team2_table, row)
+        )
+
+    def apply_theme(self, theme_mode):
+        self.theme_mode = theme_mode
+        tokens = get_theme_tokens(theme_mode)
+        self.team1_score_label.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {tokens['team1_score']};"
+        )
+        self.team2_score_label.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {tokens['team2_score']};"
+        )
+        self.diff_label.setStyleSheet(
+            f"font-size: 14px; font-weight: bold; color: {tokens['diff_text']};"
+        )
 
     def _create_team_table(self):
         table = QTableWidget()
@@ -89,6 +103,20 @@ class TeamResultWidget(QWidget):
         table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
         return table
 
+    def _emit_account_click(self, table, row):
+        name_item = table.item(row, 1)
+        if not name_item:
+            return
+
+        user = name_item.data(Qt.UserRole)
+        if not isinstance(user, dict):
+            return
+
+        if not user.get("account_tag_line"):
+            return
+
+        self.account_clicked.emit(user)
+
     def render(self, result):
         self.fill(self.team1_table, result["a1"])
         self.fill(self.team2_table, result["a2"])
@@ -98,14 +126,17 @@ class TeamResultWidget(QWidget):
         self.diff_label.setText(f"점수 차이: {round(result['diff'], 2)}")
 
     def fill(self, table, assign):
+        tokens = get_theme_tokens(self.theme_mode)
         table.setRowCount(5)
 
         for index, position in enumerate(POSITIONS):
             pos_item = QTableWidgetItem(position)
-            pos_item.setForeground(QBrush(QColor("#E0E0E0")))
+            pos_item.setForeground(QBrush(QColor(tokens["muted_text"])))
             table.setItem(index, 0, pos_item)
 
             if position not in assign:
+                for col in range(1, 6):
+                    table.setItem(index, col, QTableWidgetItem(""))
                 continue
 
             user = assign[position]
@@ -114,8 +145,9 @@ class TeamResultWidget(QWidget):
             detail = user.get("tier_detail", 2)
 
             name_item = QTableWidgetItem(name)
-            name_item.setBackground(QColor("#FFFFFF"))
-            name_item.setForeground(QBrush(QColor("#000000")))
+            name_item.setBackground(QColor(tokens["result_name_bg"]))
+            name_item.setForeground(QBrush(QColor(tokens["result_name_fg"])))
+            name_item.setData(Qt.UserRole, user)
             table.setItem(index, 1, name_item)
 
             tier_color = QColor(TIER_COLOR.get(tier, "#ffffff"))
@@ -131,19 +163,15 @@ class TeamResultWidget(QWidget):
             table.setItem(index, 3, detail_item)
 
             form_bonus = calc_recent_form_bonus(user)
-            form_text = "-"
-            if user.get("recent_match_count", 0):
-                form_text = f"{form_bonus * 100:+.1f}%"
+            form_text = f"{form_bonus * 100:+.1f}%" if user.get("recent_match_count", 0) else "-"
 
             form_item = QTableWidgetItem(form_text)
-            form_item.setForeground(QBrush(QColor("#E0E0E0")))
+            form_item.setForeground(QBrush(QColor(tokens["muted_text"])))
             table.setItem(index, 4, form_item)
 
             fit_bonus = calc_position_fit_bonus(user, position)
-            fit_text = "-"
-            if user.get("recent_match_count", 0):
-                fit_text = f"{fit_bonus * 100:+.1f}%"
+            fit_text = f"{fit_bonus * 100:+.1f}%" if user.get("recent_match_count", 0) else "-"
 
             fit_item = QTableWidgetItem(fit_text)
-            fit_item.setForeground(QBrush(QColor("#E0E0E0")))
+            fit_item.setForeground(QBrush(QColor(tokens["muted_text"])))
             table.setItem(index, 5, fit_item)

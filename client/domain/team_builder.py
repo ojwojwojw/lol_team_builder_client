@@ -3,7 +3,7 @@ import json
 import random
 from pathlib import Path
 
-from util.constants import (
+from domain.constants import (
     ANY_POSITION,
     DEFAULT_TIER_SCORE,
     POSITIONS,

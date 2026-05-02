@@ -7,6 +7,12 @@ router = APIRouter()
 match_service = MatchService()
 
 
+@router.get("/accounts")
+def list_accounts(limit: int = Query(100, ge=1, le=1000)):
+    """Return stored riot_account rows ordered by latest fetch time."""
+    return match_service.list_accounts(limit)
+
+
 @router.get("/accounts/by-game-name")
 def get_accounts_by_game_name(game_name: str = Query(..., min_length=1)):
     """Return stored riot_account rows for one game name."""
@@ -16,7 +22,7 @@ def get_accounts_by_game_name(game_name: str = Query(..., min_length=1)):
 @router.get("/accounts/search")
 def search_accounts_by_game_name(
     keyword: str = Query(..., min_length=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1000, ge=1, le=1000),
 ):
     """Return stored riot_account rows using a game_name LIKE search."""
     return match_service.search_accounts_by_game_name(keyword.strip(), limit)

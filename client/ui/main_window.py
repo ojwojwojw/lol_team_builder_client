@@ -22,11 +22,26 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from application.recent_match_views import (
+    CHAMPION_SUMMARY_COLUMNS,
+    MATCH_DETAIL_COLUMNS,
+    MATCH_TABLE_COLUMNS,
+    POSITION_SUMMARY_COLUMNS,
+    build_champion_summary_rows,
+    build_empty_recent_summary_text,
+    build_loading_recent_summary_text,
+    build_position_summary_rows,
+    build_recent_match_error_text,
+    build_recent_match_rows,
+    build_recent_summary_text,
+)
+from application.team_app import team_app
+from domain.constants import ACCOUNT_SEARCH_LIMIT, ANY_POSITION
 from ui.config_dialog import ConfigDialog
-from ui.presenter import team_presenter
+from ui.style_loader import load_style
 from ui.team_result_widget import TeamResultWidget
+from ui.theme import get_recent_summary_style
 from ui.user_table_widget import UserTableWidget
-from util.constants import ANY_POSITION
 
 
 class MainWindow(QWidget):
@@ -41,9 +56,11 @@ class MainWindow(QWidget):
         self.selected_account = None
         self.selected_match = None
         self.recent_matches = []
+        self.theme_mode = team_app.load_theme_mode()
 
         self._create_ui()
         self._connect_signals()
+        self.apply_theme()
         self.load_dataset_list()
 
     def _log_exception(self, title, exc):
@@ -55,11 +72,7 @@ class MainWindow(QWidget):
         except Exception:
             pass
 
-        QMessageBox.critical(
-            self,
-            title,
-            f"{exc}\n\n상세 로그: {log_path}",
-        )
+        QMessageBox.critical(self, title, f"{exc}\n\n상세 로그: {log_path}")
 
     def _create_ui(self):
         layout = QVBoxLayout()
@@ -72,14 +85,12 @@ class MainWindow(QWidget):
 
     def _build_left_panel_widget(self):
         container = QWidget()
-        layout = self._create_left_panel()
-        container.setLayout(layout)
+        container.setLayout(self._create_left_panel())
         return container
 
     def _build_right_panel_widget(self):
         container = QWidget()
-        layout = self._create_right_panel()
-        container.setLayout(layout)
+        container.setLayout(self._create_right_panel())
         return container
 
     def _create_left_panel(self):
@@ -87,12 +98,19 @@ class MainWindow(QWidget):
 
         self.dataset_list = QListWidget()
         self.new_btn = QPushButton("데이터셋 생성")
+        self.copy_dataset_btn = QPushButton("데이터셋 복사")
+        self.delete_dataset_btn = QPushButton("데이터셋 삭제")
         self.user_table = UserTableWidget()
         self.config_btn = QPushButton("설정")
 
+        dataset_btn_row = QHBoxLayout()
+        dataset_btn_row.addWidget(self.new_btn)
+        dataset_btn_row.addWidget(self.copy_dataset_btn)
+        dataset_btn_row.addWidget(self.delete_dataset_btn)
+
         left.addWidget(QLabel("데이터셋"))
         left.addWidget(self.dataset_list, 2)
-        left.addWidget(self.new_btn)
+        left.addLayout(dataset_btn_row)
         left.addWidget(QLabel("유저 목록"))
         left.addWidget(self.user_table, 7)
         left.addWidget(self.config_btn)
@@ -107,32 +125,25 @@ class MainWindow(QWidget):
         return right
 
     def _create_api_panel(self):
-        group = QGroupBox("실제 전적 분석")
+        group = QGroupBox("최근 전적 분석")
         layout = QVBoxLayout()
 
         search_row = QHBoxLayout()
         self.account_keyword_input = QLineEdit()
         self.account_keyword_input.setPlaceholderText("게임 닉네임을 검색하세요")
-        self.account_search_limit = QSpinBox()
-        self.account_search_limit.setRange(1, 100)
-        self.account_search_limit.setValue(20)
-        self.account_search_btn = QPushButton("계정 검색")
         search_row.addWidget(QLabel("검색어"))
         search_row.addWidget(self.account_keyword_input, 1)
-        search_row.addWidget(QLabel("개수"))
-        search_row.addWidget(self.account_search_limit)
-        search_row.addWidget(self.account_search_btn)
 
         action_row = QHBoxLayout()
         self.recent_match_limit = QSpinBox()
         self.recent_match_limit.setRange(1, 100)
         self.recent_match_limit.setValue(10)
-        self.recent_match_btn = QPushButton("최근 전적 불러오기")
+        self.account_search_btn = QPushButton("계정 검색")
         self.apply_user_btn = QPushButton("선택 유저 추가")
         self.match_detail_btn = QPushButton("경기 상세 보기")
         action_row.addWidget(QLabel("최근 경기 수"))
         action_row.addWidget(self.recent_match_limit)
-        action_row.addWidget(self.recent_match_btn)
+        action_row.addWidget(self.account_search_btn)
         action_row.addWidget(self.apply_user_btn)
         action_row.addWidget(self.match_detail_btn)
 
@@ -142,38 +153,26 @@ class MainWindow(QWidget):
         info_row.addWidget(self.selected_account_label, 1)
         info_row.addWidget(self.selected_match_label, 1)
 
-        self.recent_summary_label = QLabel(
-            "최근 요약: 계정을 선택하면 승률, KDA, 주 포지션 통계를 볼 수 있습니다."
-        )
-        self.recent_summary_label.setStyleSheet(
-            "font-size: 14px; font-weight: bold; color: #d9e6ff; "
-            "background-color: #1f2c3a; border-radius: 6px; padding: 8px;"
-        )
+        self.recent_summary_label = QLabel(build_empty_recent_summary_text())
 
         content_row = QHBoxLayout()
 
         account_box = QVBoxLayout()
-        account_box.addWidget(QLabel("검색 계정"))
+        account_box.addWidget(QLabel("검색된 계정"))
         self.account_list = QListWidget()
         account_box.addWidget(self.account_list)
 
         center_box = QVBoxLayout()
         center_box.addWidget(QLabel("최근 경기"))
-        self.match_table = self._create_table(
-            ["일시", "챔피언", "포지션", "결과", "K/D/A", "CS", "시야", "딜량", "골드"]
-        )
+        self.match_table = self._create_table(MATCH_TABLE_COLUMNS)
         center_box.addWidget(self.match_table)
 
         summary_box = QVBoxLayout()
         summary_box.addWidget(QLabel("포지션 통계"))
-        self.position_summary_table = self._create_table(
-            ["포지션", "경기 수", "승", "패", "승률"]
-        )
+        self.position_summary_table = self._create_table(POSITION_SUMMARY_COLUMNS)
         summary_box.addWidget(self.position_summary_table)
         summary_box.addWidget(QLabel("챔피언 통계"))
-        self.champion_summary_table = self._create_table(
-            ["챔피언", "경기 수", "승", "패", "승률"]
-        )
+        self.champion_summary_table = self._create_table(CHAMPION_SUMMARY_COLUMNS)
         summary_box.addWidget(self.champion_summary_table)
 
         content_row.addLayout(account_box, 2)
@@ -182,9 +181,7 @@ class MainWindow(QWidget):
 
         detail_box = QVBoxLayout()
         detail_box.addWidget(QLabel("선택 경기 참가자"))
-        self.match_detail_table = self._create_table(
-            ["소환사", "챔피언", "포지션", "결과", "K/D/A", "CS", "딜량", "시야"]
-        )
+        self.match_detail_table = self._create_table(MATCH_DETAIL_COLUMNS)
         detail_box.addWidget(self.match_detail_table)
 
         layout.addLayout(search_row)
@@ -210,6 +207,8 @@ class MainWindow(QWidget):
     def _connect_signals(self):
         self.dataset_list.itemClicked.connect(self.load_dataset)
         self.new_btn.clicked.connect(self.create_dataset)
+        self.copy_dataset_btn.clicked.connect(self.copy_dataset)
+        self.delete_dataset_btn.clicked.connect(self.delete_dataset)
 
         self.user_table.toggle_clicked.connect(self.user_table.toggle_all)
         self.user_table.add_clicked.connect(self.user_table.add_row)
@@ -218,14 +217,25 @@ class MainWindow(QWidget):
 
         self.team_result.generate_clicked.connect(self.make_team)
         self.team_result.copy_clicked.connect(self.copy)
+        self.team_result.account_clicked.connect(self.open_account_from_team_result)
 
         self.config_btn.clicked.connect(self.open_config_dialog)
         self.account_search_btn.clicked.connect(self.search_accounts)
-        self.recent_match_btn.clicked.connect(self.load_recent_matches)
+        self.account_keyword_input.returnPressed.connect(self.search_accounts)
         self.apply_user_btn.clicked.connect(self.apply_selected_user_to_table)
         self.match_detail_btn.clicked.connect(self.load_match_detail)
         self.account_list.itemClicked.connect(self.select_account)
         self.match_table.itemSelectionChanged.connect(self.select_match_from_table)
+
+    def apply_theme(self):
+        self.theme_mode = team_app.load_theme_mode()
+        app = QApplication.instance()
+        if app is not None:
+            load_style(app, self.theme_mode)
+
+        self.recent_summary_label.setStyleSheet(get_recent_summary_style(self.theme_mode))
+        self.user_table.apply_theme(self.theme_mode)
+        self.team_result.apply_theme(self.theme_mode)
 
     def _normalize_positions(self, users):
         normalized = []
@@ -257,100 +267,155 @@ class MainWindow(QWidget):
         self.selected_match = None
         self.recent_matches = []
         self.selected_match_label.setText("선택 경기: -")
-        self.recent_summary_label.setText(
-            "최근 요약: 계정을 선택하면 승률, KDA, 주 포지션 통계를 볼 수 있습니다."
-        )
+        self.recent_summary_label.setText(build_empty_recent_summary_text())
 
     def _fill_table(self, table, rows, columns):
         table.setRowCount(len(rows))
         for row_index, row_data in enumerate(rows):
             for col_index, column_name in enumerate(columns):
-                value = row_data.get(column_name, "")
-                table.setItem(row_index, col_index, QTableWidgetItem(str(value)))
+                table.setItem(
+                    row_index,
+                    col_index,
+                    QTableWidgetItem(str(row_data.get(column_name, ""))),
+                )
 
     def _render_recent_summary(self, summary):
-        if not summary.get("match_count"):
-            self.recent_summary_label.setText(
-                "최근 요약: 아직 불러온 경기가 없습니다. 계정은 지금 바로 표에 추가할 수 있습니다."
-            )
-            return
+        self.recent_summary_label.setText(build_recent_summary_text(summary))
 
-        self.recent_summary_label.setText(
-            "최근 요약: "
-            f"{summary['match_count']}경기 {summary['wins']}승 {summary['losses']}패"
-            f" / 승률 {summary['recent_win_rate']}%"
-            f" / 평균 KDA {summary['recent_kda']}"
-            f" / 평균 CS {summary['avg_cs']}"
-            f" / 주 챔피언 {summary['main_champion']}"
+    def _render_recent_matches(self, matches):
+        self._fill_table(
+            self.match_table,
+            build_recent_match_rows(matches),
+            MATCH_TABLE_COLUMNS,
+        )
+
+    def _render_position_summary(self, stats):
+        self._fill_table(
+            self.position_summary_table,
+            build_position_summary_rows(stats),
+            POSITION_SUMMARY_COLUMNS,
+        )
+
+    def _render_champion_summary(self, stats):
+        self._fill_table(
+            self.champion_summary_table,
+            build_champion_summary_rows(stats),
+            CHAMPION_SUMMARY_COLUMNS,
         )
 
     def load_dataset_list(self):
         self.dataset_list.clear()
-        self.dataset_list.addItems(team_presenter.get_dataset_list())
+        self.dataset_list.addItems(team_app.get_dataset_list())
 
     def load_dataset(self, item):
         self.current_file = item.text()
-        users = team_presenter.load_dataset(self.current_file)
+        users = team_app.load_dataset(self.current_file)
         self.user_table.populate(users)
 
     def create_dataset(self):
-        name, ok = QInputDialog.getText(self, "데이터셋 생성", "파일명을 입력하세요")
+        name, ok = QInputDialog.getText(self, "데이터셋 생성", "파일명을 입력하세요.")
         if not ok or not name.strip():
             return
 
         try:
-            file_name = team_presenter.create_dataset(name.strip())
+            file_name = team_app.create_dataset(name.strip())
             self.load_dataset_list()
             self.current_file = file_name
-            users = team_presenter.load_dataset(file_name)
+            users = team_app.load_dataset(file_name)
             self.user_table.populate(users)
             QMessageBox.information(self, "완료", f"{file_name} 생성 완료")
         except FileExistsError:
             QMessageBox.warning(self, "오류", "이미 존재하는 파일입니다.")
+
+    def copy_dataset(self):
+        if not self.current_file:
+            QMessageBox.warning(self, "오류", "복사할 데이터셋을 먼저 선택해주세요.")
+            return
+
+        name, ok = QInputDialog.getText(
+            self,
+            "데이터셋 복사",
+            "새 데이터셋 이름을 입력하세요.",
+            text=f"{Path(self.current_file).stem}_copy",
+        )
+        if not ok or not name.strip():
+            return
+
+        try:
+            source_users = team_app.load_dataset(self.current_file)
+            new_file_name = team_app.create_dataset(name.strip())
+            team_app.save_dataset(new_file_name, source_users)
+            self.load_dataset_list()
+            self.current_file = new_file_name
+            self.user_table.populate(source_users)
+            QMessageBox.information(self, "완료", f"{new_file_name} 복사 완료")
+        except FileExistsError:
+            QMessageBox.warning(self, "오류", "이미 존재하는 파일입니다.")
+
+    def delete_dataset(self):
+        if not self.current_file:
+            QMessageBox.warning(self, "오류", "삭제할 데이터셋을 먼저 선택해주세요.")
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "데이터셋 삭제",
+            f"{self.current_file} 파일을 정말 삭제하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        try:
+            deleted_file = self.current_file
+            team_app.delete_dataset(deleted_file)
+            self.current_file = None
+            self.user_table.populate([])
+            self.load_dataset_list()
+            QMessageBox.information(self, "완료", f"{deleted_file} 삭제 완료")
+        except FileNotFoundError:
+            QMessageBox.warning(self, "오류", "삭제할 데이터셋 파일을 찾지 못했습니다.")
 
     def save(self):
         if not self.current_file:
             QMessageBox.warning(self, "오류", "데이터셋을 먼저 선택해주세요.")
             return
 
-        users, error = team_presenter.extract_table_data(self.user_table.table)
+        users, error = team_app.extract_table_data(self.user_table.table)
         if error:
             QMessageBox.warning(self, "입력 오류", error)
             return
 
         users = self._normalize_positions(users)
-        team_presenter.save_dataset(self.current_file, users)
+        team_app.save_dataset(self.current_file, users)
         QMessageBox.information(self, "저장 완료", "데이터가 저장되었습니다.")
 
     def make_team(self):
         try:
-            selected = team_presenter.extract_selected_users(self.user_table.table)
+            selected = team_app.extract_selected_users(self.user_table.table)
             if not selected:
                 QMessageBox.warning(self, "오류", "선택된 유저가 없습니다.")
                 return
 
             selected = self._normalize_positions(selected)
-            result, error = team_presenter.build_teams(selected)
+            result, error = team_app.build_teams(selected)
             if error:
                 QMessageBox.warning(self, "오류", error)
                 return
 
             self.team_result.render(result)
-            self.result_text = team_presenter.format_team_result(
-                result["a1"],
-                result["a2"],
-            )
+            self.result_text = team_app.format_team_result(result["a1"], result["a2"])
 
             if result.get("alerts"):
-                alert_msg = team_presenter.format_alerts(result["alerts"])
+                alert_msg = team_app.format_alerts(result["alerts"])
                 if alert_msg:
                     QMessageBox.information(self, "밸런스 주의", alert_msg)
 
             if result.get("warnings"):
-                warning_msg = team_presenter.format_warnings(result["warnings"])
+                warning_msg = team_app.format_warnings(result["warnings"])
                 if warning_msg:
                     QMessageBox.warning(self, "라인 밸런스 경고", warning_msg)
-
         except Exception as exc:
             QMessageBox.critical(self, "팀 생성 실패", str(exc))
 
@@ -360,22 +425,22 @@ class MainWindow(QWidget):
             return
 
         QApplication.clipboard().setText(self.result_text)
-        QMessageBox.information(self, "완료", "클립보드에 복사했습니다.")
+        QMessageBox.information(self, "완료", "클립보드에 복사되었습니다.")
 
     def open_config_dialog(self):
         dialog = ConfigDialog()
-        dialog.exec_()
+        if dialog.exec_():
+            self.apply_theme()
 
     def search_accounts(self):
         keyword = self.account_keyword_input.text().strip()
-        limit = self.account_search_limit.value()
 
         if not keyword:
             QMessageBox.warning(self, "오류", "검색어를 입력해주세요.")
             return
 
         try:
-            result = team_presenter.search_accounts(keyword, limit)
+            result = team_app.search_accounts(keyword, ACCOUNT_SEARCH_LIMIT)
         except Exception as exc:
             QMessageBox.critical(self, "API 오류", str(exc))
             return
@@ -408,33 +473,58 @@ class MainWindow(QWidget):
         self.selected_account_label.setText(f"선택 계정: {game_name}#{tag_line}")
         self._fetch_recent_matches(show_feedback=False)
 
-    def load_recent_matches(self):
-        if not self.selected_account:
-            QMessageBox.warning(self, "오류", "계정을 먼저 선택해주세요.")
+    def open_account_from_team_result(self, user):
+        game_name = (user.get("name") or user.get("account_game_name") or "").strip()
+        tag_line = (user.get("account_tag_line") or "").strip()
+        if not game_name or not tag_line:
             return
 
-        self._fetch_recent_matches(show_feedback=True)
+        self.account_keyword_input.setText(game_name)
+        try:
+            result = team_app.search_accounts(game_name, ACCOUNT_SEARCH_LIMIT)
+        except Exception:
+            return
+
+        self.account_list.clear()
+        self.selected_account = None
+        self.selected_account_label.setText("선택 계정: -")
+        self._clear_match_views()
+
+        matched_item = None
+        for account in result.get("accounts", []):
+            label = f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, account)
+            self.account_list.addItem(item)
+
+            if (
+                (account.get("game_name", "").strip().lower() == game_name.lower())
+                and (account.get("tag_line", "").strip().lower() == tag_line.lower())
+            ):
+                matched_item = item
+
+        if matched_item is not None:
+            self.account_list.setCurrentItem(matched_item)
+            self.select_account(matched_item)
 
     def _fetch_recent_matches(self, show_feedback):
-        self.recent_summary_label.setText("최근 요약: 최근 전적을 불러오는 중입니다...")
+        self.recent_summary_label.setText(build_loading_recent_summary_text())
 
         try:
-            result = team_presenter.get_recent_matches_by_riot_id(
+            result = team_app.get_recent_matches_by_riot_id(
                 self.selected_account.get("game_name", ""),
                 self.selected_account.get("tag_line", ""),
                 self.recent_match_limit.value(),
             )
         except Exception as exc:
             self._clear_match_views()
-            self.recent_summary_label.setText(
-                "최근 요약: 최근 전적을 불러오지 못했습니다. 계정 정보만으로 추가할 수 있습니다."
-            )
+            self.recent_summary_label.setText(build_recent_match_error_text())
             if show_feedback:
                 QMessageBox.critical(self, "API 오류", str(exc))
             return False
 
         self.recent_matches = result.get("matches", [])
-        summary = team_presenter.summarize_recent_matches(self.recent_matches)
+        summary = team_app.summarize_recent_matches(self.recent_matches)
         self._render_recent_summary(summary)
         self._render_recent_matches(self.recent_matches)
         self._render_position_summary(summary["position_stats"])
@@ -452,63 +542,6 @@ class MainWindow(QWidget):
         self.select_match_from_table()
         return True
 
-    def _render_recent_matches(self, matches):
-        rows = []
-        for match in matches:
-            rows.append({
-                "일시": team_presenter.format_match_datetime(
-                    match.get("game_start_timestamp")
-                ),
-                "챔피언": match.get("champion_name", "-"),
-                "포지션": team_presenter.get_match_position(match),
-                "결과": team_presenter.get_match_result_text(match),
-                "K/D/A": team_presenter.format_kda(match),
-                "CS": team_presenter.get_match_cs(match),
-                "시야": match.get("vision_score", 0) or 0,
-                "딜량": match.get("total_damage_dealt_to_champions", 0) or 0,
-                "골드": match.get("gold_earned", 0) or 0,
-            })
-
-        self._fill_table(
-            self.match_table,
-            rows,
-            ["일시", "챔피언", "포지션", "결과", "K/D/A", "CS", "시야", "딜량", "골드"],
-        )
-
-    def _render_position_summary(self, stats):
-        rows = []
-        for item in stats:
-            rows.append({
-                "포지션": item["position"],
-                "경기 수": item["count"],
-                "승": item["wins"],
-                "패": item["losses"],
-                "승률": f"{item['win_rate']}%",
-            })
-
-        self._fill_table(
-            self.position_summary_table,
-            rows,
-            ["포지션", "경기 수", "승", "패", "승률"],
-        )
-
-    def _render_champion_summary(self, stats):
-        rows = []
-        for item in stats:
-            rows.append({
-                "챔피언": item["champion_name"],
-                "경기 수": item["count"],
-                "승": item["wins"],
-                "패": item["losses"],
-                "승률": f"{item['win_rate']}%",
-            })
-
-        self._fill_table(
-            self.champion_summary_table,
-            rows,
-            ["챔피언", "경기 수", "승", "패", "승률"],
-        )
-
     def select_match_from_table(self):
         row = self.match_table.currentRow()
         if row < 0 or row >= len(self.recent_matches):
@@ -525,9 +558,7 @@ class MainWindow(QWidget):
             return
 
         try:
-            result = team_presenter.get_match_detail(
-                self.selected_match.get("match_id", "")
-            )
+            result = team_app.get_match_detail(self.selected_match.get("match_id", ""))
         except Exception as exc:
             QMessageBox.critical(self, "API 오류", str(exc))
             return
@@ -536,18 +567,29 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "조회 실패", result["error"])
             return
 
-        participants = team_presenter.normalize_match_detail(result)
+        participants = team_app.normalize_match_detail(result)
         self._fill_table(
             self.match_detail_table,
             participants,
-            ["summoner_name", "champion_name", "position", "result", "kda", "cs", "damage", "vision"],
+            [
+                "summoner_name",
+                "champion_name",
+                "position",
+                "result",
+                "kda",
+                "cs",
+                "damage",
+                "vision",
+            ],
         )
-        self.match_detail_table.setHorizontalHeaderLabels(
-            ["소환사", "챔피언", "포지션", "결과", "K/D/A", "CS", "딜량", "시야"]
-        )
+        self.match_detail_table.setHorizontalHeaderLabels(MATCH_DETAIL_COLUMNS)
 
     def apply_selected_user_to_table(self):
         try:
+            if not self.current_file:
+                QMessageBox.warning(self, "오류", "데이터셋을 먼저 불러와주세요.")
+                return
+
             if not self.selected_account:
                 QMessageBox.warning(self, "오류", "계정을 먼저 선택해주세요.")
                 return
@@ -560,7 +602,7 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "중복 유저", "이미 표에 추가된 유저입니다.")
                 return
 
-            user_profile = team_presenter.build_user_profile(
+            user_profile = team_app.build_user_profile(
                 self.selected_account,
                 self.recent_matches,
             )
@@ -573,14 +615,14 @@ class MainWindow(QWidget):
             if self.recent_matches:
                 message = (
                     "선택한 유저를 표에 추가했습니다.\n"
-                    "최근 승률과 KDA, 포지션 통계가 숨은 데이터로 함께 저장됩니다.\n"
+                    "최근 승률과 KDA, 포지션 통계가 함께 저장됩니다.\n"
                     "티어는 직접 확인 후 조정해주세요."
                 )
             else:
                 message = (
                     "선택한 유저를 표에 추가했습니다.\n"
-                    "최근 전적을 아직 불러오지 않았으므로 포지션은 기본값으로 들어갑니다.\n"
-                    "나중에 전적을 불러온 뒤 다시 추가하지 않고도 티어만 수정해서 사용할 수 있습니다."
+                    "최근 전적을 아직 불러오지 않아 수치가 기본값으로 들어갑니다.\n"
+                    "필요하면 전적을 불러온 뒤 다시 조정해주세요."
                 )
 
             QMessageBox.information(self, "추가 완료", message)

@@ -3,8 +3,10 @@ import traceback
 from pathlib import Path
 
 from PyQt5.QtWidgets import QApplication
+
+from application.team_app import team_app
 from ui.main_window import MainWindow
-from ui.style_loader import load_style  
+from ui.style_loader import load_style
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
@@ -19,13 +21,14 @@ def log_unhandled_exception(exc_type, exc_value, exc_traceback):
 
     sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
+
 if __name__ == "__main__":
     sys.excepthook = log_unhandled_exception
     app = QApplication(sys.argv)
 
-    load_style(app)   # ✔ 먼저 적용
+    load_style(app, team_app.load_theme_mode())
 
     win = MainWindow()
     win.show()
 
-    sys.exit(app.exec_())   
+    sys.exit(app.exec_())

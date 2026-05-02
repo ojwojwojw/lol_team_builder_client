@@ -13,14 +13,15 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from util.constants import (
+from domain.constants import (
     ANY_POSITION,
+    DEFAULT_THEME_MODE,
     POSITION_OPTIONS,
-    TIER_COLOR,
     TIER_LIST,
     normalize_position_name,
     normalize_tier_name,
 )
+from ui.theme import TIER_COLOR, get_theme_tokens
 
 
 VISIBLE_USER_KEYS = {"selected", "name", "tier", "tier_detail", "positions"}
@@ -37,8 +38,10 @@ class UserTableWidget(QWidget):
         self._row_widget_map = {}
         self._is_building_row = False
         self._selected_row = -1
+        self.theme_mode = DEFAULT_THEME_MODE
         self._create_ui()
         self._connect_signals()
+        self.apply_theme(self.theme_mode)
 
     def _log_debug(self, message):
         log_path = Path(__file__).resolve().parent.parent / "team_builder_client_error.log"
@@ -69,18 +72,6 @@ class UserTableWidget(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setAlternatingRowColors(True)
-        self.table.setStyleSheet(
-            """
-            QTableWidget {
-                gridline-color: #404040;
-                alternate-background-color: #20242b;
-                background-color: #171a20;
-            }
-            QTableWidget::item:selected {
-                background-color: #35516b;
-            }
-            """
-        )
         self.table.horizontalHeader().setStretchLastSection(False)
         self.table.setColumnWidth(0, 78)
         self.table.setColumnWidth(1, 220)
@@ -112,6 +103,23 @@ class UserTableWidget(QWidget):
         self.delete_btn.clicked.connect(self.delete_clicked.emit)
         self.save_btn.clicked.connect(self.save_clicked.emit)
 
+    def apply_theme(self, theme_mode):
+        self.theme_mode = theme_mode
+        tokens = get_theme_tokens(theme_mode)
+        self.table.setStyleSheet(
+            f"""
+            QTableWidget {{
+                gridline-color: {tokens['table_gridline']};
+                alternate-background-color: {tokens['table_alt_bg']};
+                background-color: {tokens['table_bg']};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {tokens['table_selected_bg']};
+            }}
+            """
+        )
+        self.refresh_row_highlight()
+
     def populate(self, users):
         try:
             self._log_debug(f"populate start rows={len(users)}")
@@ -121,10 +129,7 @@ class UserTableWidget(QWidget):
             for row, user in enumerate(users):
                 self._set_row_widgets(row, user)
             self._is_building_row = False
-            if users:
-                self._selected_row = 0
-            else:
-                self._selected_row = -1
+            self._selected_row = 0 if users else -1
             self.refresh_row_highlight()
             self._log_debug("populate done")
         except Exception as exc:
@@ -187,12 +192,10 @@ class UserTableWidget(QWidget):
             row = self.table.rowCount()
             self._is_building_row = True
             self.table.insertRow(row)
-            self._log_debug(f"add_user inserted row={row}")
             self._set_row_widgets(row, user)
             self._is_building_row = False
             self._selected_row = row
             self.refresh_row_highlight()
-            self._log_debug("add_user after refresh")
             self._log_debug("add_user done")
             return True
         except Exception as exc:
@@ -203,7 +206,6 @@ class UserTableWidget(QWidget):
     def _set_row_widgets(self, row, user=None):
         try:
             user = user or {}
-            self._log_debug(f"_set_row_widgets start row={row} name={user.get('name', '')!r}")
 
             chk = QCheckBox()
             chk.setChecked(user.get("selected", False))
@@ -247,7 +249,6 @@ class UserTableWidget(QWidget):
             self.bind_tier_change(tier)
             if not self._is_building_row:
                 self.refresh_row_highlight()
-            self._log_debug(f"_set_row_widgets done row={row}")
         except Exception as exc:
             self._log_exception(f"_set_row_widgets failed row={row}", exc)
             raise
@@ -326,16 +327,12 @@ class UserTableWidget(QWidget):
     def add_row(self):
         try:
             row = self.table.rowCount()
-            self._log_debug(f"add_row start row={row}")
             self._is_building_row = True
             self.table.insertRow(row)
-            self._log_debug(f"add_row inserted row={row}")
             self._set_row_widgets(row)
             self._is_building_row = False
             self._selected_row = row
             self.refresh_row_highlight()
-            self._log_debug("add_row after refresh")
-            self._log_debug(f"add_row done row={row}")
         except Exception as exc:
             self._is_building_row = False
             self._log_exception("add_row failed", exc)
@@ -344,7 +341,6 @@ class UserTableWidget(QWidget):
     def delete_row(self):
         try:
             row = self._selected_row
-            self._log_debug(f"delete_row start current_row={row}")
             if row >= 0:
                 self.table.removeRow(row)
                 self._row_widget_map = {
@@ -352,12 +348,8 @@ class UserTableWidget(QWidget):
                     for widget, mapped_row in self._row_widget_map.items()
                     if mapped_row != row
                 }
-                if self.table.rowCount():
-                    self._selected_row = min(row, self.table.rowCount() - 1)
-                else:
-                    self._selected_row = -1
+                self._selected_row = min(row, self.table.rowCount() - 1) if self.table.rowCount() else -1
                 self.refresh_row_highlight()
-            self._log_debug("delete_row done")
         except Exception as exc:
             self._log_exception("delete_row failed", exc)
             raise
@@ -378,15 +370,16 @@ class UserTableWidget(QWidget):
         return TIER_COLOR.get(tier, "#ffffff")
 
     def apply_tier_style(self, combo, is_selected=False):
+        tokens = get_theme_tokens(self.theme_mode)
         tier = combo.currentText()
         color = self.get_tier_color(tier)
-        border_color = "#ffd966" if is_selected else "#3a3a3a"
+        border_color = tokens["row_selected_border"] if is_selected else tokens["row_default_border"]
 
         combo.setStyleSheet(
             f"""
             QComboBox {{
                 background-color: {color};
-                color: black;
+                color: {tokens['tier_text']};
                 font-weight: bold;
                 border-radius: 4px;
                 border: 2px solid {border_color};
@@ -413,12 +406,13 @@ class UserTableWidget(QWidget):
         if self._is_building_row:
             return
 
+        tokens = get_theme_tokens(self.theme_mode)
         current_row = self._selected_row
 
         for row in range(self.table.rowCount()):
             selected = row == current_row
-            row_border = "#ffd966" if selected else "#4a4a4a"
-            row_bg = "#253546" if selected else "#1f1f1f"
+            row_border = tokens["row_selected_border"] if selected else tokens["row_default_border"]
+            row_bg = tokens["row_selected_bg"] if selected else tokens["row_default_bg"]
 
             name_edit = self.table.cellWidget(row, 1)
             if name_edit:
@@ -426,7 +420,7 @@ class UserTableWidget(QWidget):
                     f"""
                     QLineEdit {{
                         background-color: {row_bg};
-                        color: white;
+                        color: {tokens['input_text']};
                         border: 2px solid {row_border};
                         padding: 2px;
                         font-weight: {'bold' if selected else 'normal'};
@@ -452,7 +446,7 @@ class UserTableWidget(QWidget):
                     f"""
                     QComboBox {{
                         background-color: {row_bg};
-                        color: white;
+                        color: {tokens['input_text']};
                         border: 2px solid {row_border};
                         padding: 2px;
                     }}
@@ -470,7 +464,7 @@ class UserTableWidget(QWidget):
                         f"""
                         QComboBox {{
                             background-color: {row_bg};
-                            color: white;
+                            color: {tokens['input_text']};
                             border: 2px solid {row_border};
                             padding: 2px;
                         }}

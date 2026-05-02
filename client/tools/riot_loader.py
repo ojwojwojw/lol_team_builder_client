@@ -23,7 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from service.dataset_service import load_server_base_url
+from domain.constants import ACCOUNT_SEARCH_LIMIT
+from repositories.dataset_repository import load_server_base_url
 
 
 class RiotLoaderWidget(QWidget):
@@ -90,14 +91,12 @@ class RiotLoaderWidget(QWidget):
         search_row = QHBoxLayout()
         self.account_keyword_input = QLineEdit()
         self.account_keyword_input.setPlaceholderText("riot_account에서 닉네임 검색")
-        self.account_search_limit = QSpinBox()
-        self.account_search_limit.setRange(1, 100)
-        self.account_search_limit.setValue(20)
+        self.account_list_all_btn = QPushButton("전체 불러오기")
+        self.account_list_all_btn.clicked.connect(self.load_all_stored_accounts)
         self.account_search_btn = QPushButton("저장 계정 검색")
         self.account_search_btn.clicked.connect(self.search_stored_accounts)
         search_row.addWidget(self.account_keyword_input, 1)
-        search_row.addWidget(QLabel("개수"))
-        search_row.addWidget(self.account_search_limit)
+        search_row.addWidget(self.account_list_all_btn)
         search_row.addWidget(self.account_search_btn)
         layout.addLayout(search_row)
 
@@ -135,6 +134,7 @@ class RiotLoaderWidget(QWidget):
         self.match_ids_url = f"{self.api_base_url}/get_match_ids"
         self.match_detail_url = f"{self.api_base_url}/get_match_detail"
         self.store_matches_url = f"{self.api_base_url}/store_recent_matches"
+        self.list_accounts_url = f"{self.api_base_url}/accounts"
         self.search_accounts_url = f"{self.api_base_url}/accounts/search"
         self.store_selected_accounts_url = (
             f"{self.api_base_url}/store_recent_matches/by-stored-accounts"
@@ -276,37 +276,50 @@ class RiotLoaderWidget(QWidget):
     def search_stored_accounts(self):
         self.refresh_api_urls()
         keyword = self.account_keyword_input.text().strip()
-        limit = self.account_search_limit.value()
 
         if not keyword:
             self.result_box.setText("저장된 계정을 찾을 검색어를 입력해주세요.")
             return
 
-        url = f"{self.search_accounts_url}?{urlencode({'keyword': keyword, 'limit': limit})}"
+        url = f"{self.search_accounts_url}?{urlencode({'keyword': keyword, 'limit': ACCOUNT_SEARCH_LIMIT})}"
 
         try:
             response = requests.get(url, timeout=30)
             data = self._show_response(response)
-            self.account_list.clear()
-
-            if response.status_code != 200 or not data:
-                return
-
-            for account in data.get("accounts", []):
-                label = (
-                    f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
-                    f"  |  조회시각: {account.get('fetched_at', '-')}"
-                )
-                item = QListWidgetItem(label)
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                item.setCheckState(Qt.Unchecked)
-                item.setData(Qt.UserRole, account)
-                self.account_list.addItem(item)
-
-            if self.account_list.count() == 0:
-                self.result_box.setText("검색된 저장 계정이 없습니다.")
+            self._populate_account_list(response, data, "검색된 저장 계정이 없습니다.")
         except Exception as exc:
             self.result_box.setText(f"오류: {exc}")
+
+    def load_all_stored_accounts(self):
+        self.refresh_api_urls()
+        url = f"{self.list_accounts_url}?{urlencode({'limit': ACCOUNT_SEARCH_LIMIT})}"
+
+        try:
+            response = requests.get(url, timeout=30)
+            data = self._show_response(response)
+            self._populate_account_list(response, data, "불러온 저장 계정이 없습니다.")
+        except Exception as exc:
+            self.result_box.setText(f"오류: {exc}")
+
+    def _populate_account_list(self, response, data, empty_message):
+        self.account_list.clear()
+
+        if response.status_code != 200 or not data:
+            return
+
+        for account in data.get("accounts", []):
+            label = (
+                f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
+                f"  |  조회시각: {account.get('fetched_at', '-')}"
+            )
+            item = QListWidgetItem(label)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            item.setData(Qt.UserRole, account)
+            self.account_list.addItem(item)
+
+        if self.account_list.count() == 0:
+            self.result_box.setText(empty_message)
 
     def fill_manual_fields_from_item(self, item):
         account = item.data(Qt.UserRole) or {}

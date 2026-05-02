@@ -5,6 +5,17 @@ from ..queries.match_read_query import MatchReadQuery
 class MatchService:
     # Service assembles DB read results into API-friendly response payloads.
 
+    def list_accounts(self, limit: int) -> dict:
+        """Return stored riot_account rows ordered by latest fetch time."""
+        conn = get_connection()
+        match_read_query = MatchReadQuery(conn)
+        accounts = match_read_query.list_accounts(limit)
+        conn.close()
+        return {
+            "count": len(accounts),
+            "accounts": accounts,
+        }
+
     def get_accounts_by_game_name(self, game_name: str) -> dict:
         """Return stored riot_account rows for one game name."""
         conn = get_connection()

@@ -3,7 +3,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from service.dataset_service import load_server_base_url
+from repositories.dataset_repository import load_server_base_url
 
 
 class MatchApiClient:
