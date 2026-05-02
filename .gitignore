@@ -11,3 +11,11 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+build/
+dist/team_builder.exe
+data/*.json
+!data/sample.json
+!data/README.md
+dist/data/*.json
+!dist/data/sample.json
+team_builder_client_error.log
