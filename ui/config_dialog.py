@@ -1,42 +1,58 @@
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout,
-    QLabel, QSpinBox, QPushButton, QMessageBox
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
 )
-from util.constants import TIER_LIST, DEFAULT_TIER_SCORE
-from service.dataset_service import load_config, save_config
+
+from service.dataset_service import (
+    load_config,
+    load_server_base_url,
+    save_config,
+    save_server_base_url,
+)
+from util.constants import DEFAULT_TIER_SCORE, TIER_LIST
 
 
 class ConfigDialog(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("티어 가중치 설정")
-        self.resize(400, 250)
+        self.setWindowTitle("설정")
+        self.resize(500, 320)
 
         layout = QVBoxLayout()
         self.inputs = {}
 
-        # 🔥 저장된 값 로드
         config = load_config()
 
         for tier in TIER_LIST:
-            h = QHBoxLayout()
+            row = QHBoxLayout()
 
             label = QLabel(tier)
             spin = QSpinBox()
-            ## 가중치 범위 설정 
-            spin.setRange(1, 1000) 
+            spin.setRange(1, 1000)
             spin.setValue(config.get(tier, DEFAULT_TIER_SCORE[tier]))
 
-            h.addWidget(label)
-            h.addWidget(spin)
-
-            layout.addLayout(h)
+            row.addWidget(label)
+            row.addWidget(spin)
+            layout.addLayout(row)
             self.inputs[tier] = spin
+
+        server_row = QHBoxLayout()
+        server_row.addWidget(QLabel("서버 주소"))
+        self.server_url_input = QLineEdit()
+        self.server_url_input.setText(load_server_base_url())
+        server_row.addWidget(self.server_url_input)
+        layout.addLayout(server_row)
 
         save_btn = QPushButton("저장")
         save_btn.clicked.connect(self.save)
-
         layout.addWidget(save_btn)
+
         self.setLayout(layout)
 
     def save(self):
@@ -46,5 +62,6 @@ class ConfigDialog(QDialog):
         }
 
         save_config(score_map)
-        QMessageBox.information(self, "완료", "가중치 저장됨")
+        save_server_base_url(self.server_url_input.text().strip())
+        QMessageBox.information(self, "완료", "설정이 저장되었습니다.")
         self.accept()
