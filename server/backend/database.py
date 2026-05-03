@@ -1,19 +1,22 @@
 import sqlite3
-from pathlib import Path
 
+from .config import get_db_path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = PROJECT_ROOT / "riot_matches.db"
+DB_PATH = get_db_path()
 
 
 def get_connection() -> sqlite3.Connection:
-    """Create one SQLite connection using the project DB path."""
-    return sqlite3.connect(DB_PATH)
+    """Create one SQLite connection using the configured DB path."""
+    db_path = get_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(db_path)
 
 
 def init_db() -> None:
     """Create required tables if they do not exist yet."""
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     cursor.execute(

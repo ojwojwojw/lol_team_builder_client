@@ -1,0 +1,16 @@
+[Unit]
+Description=Team Builder FastAPI Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/team_builder
+Environment=TEAM_BUILDER_DB_PATH=/opt/team_builder/data/riot_matches.db
+EnvironmentFile=-/opt/team_builder/server/.env
+ExecStart=/opt/team_builder/.venv/bin/python -m uvicorn server.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

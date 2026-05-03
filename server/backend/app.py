@@ -1,22 +1,36 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
+from .config import get_allowed_origins
 from .controllers.auth_controller import router as auth_router
 from .controllers.match_controller import router as match_router
-from .controllers.riot_controller import router
+from .controllers.riot_controller import router as riot_router
 from .database import init_db
 
 
 def create_app() -> FastAPI:
-    # FastAPI 앱 조립은 여기서만 담당한다.
-    # 새 컨트롤러를 추가할 때는 router include를 이 함수에 모으면 된다.
     app = FastAPI()
+
+    allowed_origins = get_allowed_origins()
+    if allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     app.include_router(auth_router)
-    app.include_router(router)
+    app.include_router(riot_router)
     app.include_router(match_router)
+
+    @app.get("/health")
+    def health_check() -> dict[str, str]:
+        return {"status": "ok"}
 
     @app.on_event("startup")
     def on_startup() -> None:
-        # 서버가 뜰 때 필요한 최소한의 DB 준비를 보장한다.
         init_db()
 
     return app

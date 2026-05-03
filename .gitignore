@@ -7,6 +7,9 @@ venv/
 .venv/
 build/
 dist/
+server/.jwt_secret
+server/riot_matches.db
+server/.env
 client/data/*.json
 !client/data/sample.json
 !client/data/README.md
