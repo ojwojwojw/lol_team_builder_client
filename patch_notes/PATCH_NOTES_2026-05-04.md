@@ -40,8 +40,17 @@
 - DB에 이미 있는 경기는 Riot 상세 조회를 건너뛰고, 신규 경기만 Riot 매치 상세 API를 호출합니다.
 - 적재 응답에 `existing_match_ids`, `pending_match_ids`, `skipped_existing_match_ids`, `riot_detail_request_count`를 포함해 운영 중 확인할 수 있도록 했습니다.
 
+### 6. Riot 로더 구조 분리 및 스케줄러 팝업화
+
+- 메인 `riot_loader` 화면이 비대해지지 않도록 역할을 분리했습니다.
+- `client/tools/riot_loader.py`는 메인 적재 화면과 진입점만 담당하도록 정리했습니다.
+- `client/tools/riot_loader_api.py`를 추가해 Riot 로더 전용 서버 요청, URL 구성, 응답 포맷 처리를 분리했습니다.
+- 배치 스케줄러는 메인 화면에서 분리해 `client/ui/riot_loader_scheduler_dialog.py`의 별도 팝업으로 이동했습니다.
+- 스케줄러 팝업 안에도 저장 계정 검색/선택 UI를 넣어, 해당 화면에서 직접 대상 유저를 고를 수 있도록 구성했습니다.
+
 ## 영향
 
 - Riot 로더가 운영 도구로서 더 안전해졌고, 관리자만 적재 작업을 수행할 수 있게 되었습니다.
 - JWT 처리가 검증된 라이브러리 기반으로 바뀌어 유지보수성과 안정성이 좋아졌습니다.
 - 이미 저장된 경기에 대해 불필요한 Riot 상세 조회를 줄여 API 호출량과 적재 시간을 함께 줄일 수 있게 되었습니다.
+- Riot 로더와 배치 스케줄러의 책임이 분리되어 이후 UI 수정과 기능 추가가 더 쉬워졌습니다.

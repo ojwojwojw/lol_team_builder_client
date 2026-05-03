@@ -9,7 +9,6 @@ from repositories.dataset_repository import (
     load_server_base_url,
 )
 
-
 class BaseApiClient:
     """Shared HTTP client for FastAPI requests."""
 

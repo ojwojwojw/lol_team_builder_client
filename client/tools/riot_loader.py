@@ -1,11 +1,6 @@
 import sys
 from pathlib import Path
-from pprint import pformat
-from urllib.parse import urlencode
 
-import requests
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
     QFormLayout,
@@ -23,15 +18,17 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from application.team_app import team_app
-from domain.constants import ACCOUNT_SEARCH_LIMIT
-from repositories.dataset_repository import load_server_base_url
+from tools.riot_loader_api import RiotLoaderApi
 from ui.login_dialog import LoginDialog
+from ui.riot_loader_scheduler_dialog import RiotLoaderSchedulerDialog
 from ui.style_loader import load_style
 
 
@@ -41,19 +38,21 @@ class RiotLoaderWidget(QWidget):
         self.current_user = current_user or {}
         self.current_puuid = ""
         self.current_match_ids = []
-        self.api_base_url = ""
+        self.api = RiotLoaderApi()
+        self.scheduler_dialog = None
+
         self.setWindowTitle("Riot 적재 도구")
-        self.setMinimumSize(980, 780)
+        self.setMinimumSize(980, 760)
         self._create_ui()
-        self.refresh_api_urls()
         self._update_session_badge()
+        self._update_server_label()
 
     def _create_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
         root.setSpacing(14)
 
-        root.addWidget(self._build_header_card())
+        root.addWidget(self._build_header_group())
 
         content_grid = QGridLayout()
         content_grid.setHorizontalSpacing(14)
@@ -66,7 +65,7 @@ class RiotLoaderWidget(QWidget):
 
         root.addWidget(self._build_result_group(), 1)
 
-    def _build_header_card(self):
+    def _build_header_group(self):
         box = QGroupBox("관리자 세션")
         layout = QVBoxLayout(box)
         layout.setSpacing(10)
@@ -78,7 +77,7 @@ class RiotLoaderWidget(QWidget):
         title.setFont(title_font)
 
         subtitle = QLabel(
-            "JWT 로그인이 필요하며, 관리자 계정만 Riot 적재 및 갱신 API를 호출할 수 있습니다."
+            "수동 적재와 저장 계정 적재를 이 화면에서 수행하고, 배치 스케줄러는 별도 팝업에서 관리합니다."
         )
         subtitle.setWordWrap(True)
 
@@ -90,9 +89,12 @@ class RiotLoaderWidget(QWidget):
         info_row.addWidget(self.session_label, 1)
 
         button_row = QHBoxLayout()
-        button_row.addStretch(1)
+        self.scheduler_btn = QPushButton("배치 스케줄러 열기")
+        self.scheduler_btn.clicked.connect(self.open_scheduler_dialog)
         self.relogin_btn = QPushButton("관리자 다시 로그인")
         self.relogin_btn.clicked.connect(self.reauthenticate)
+        button_row.addWidget(self.scheduler_btn)
+        button_row.addStretch(1)
         button_row.addWidget(self.relogin_btn)
 
         layout.addWidget(title)
@@ -156,7 +158,7 @@ class RiotLoaderWidget(QWidget):
         layout.setSpacing(10)
 
         helper = QLabel(
-            "저장된 Riot ID를 검색하고 여러 계정을 선택해 최근 경기 적재 또는 티어 갱신을 실행합니다."
+            "저장된 Riot ID를 검색하고 선택한 계정들에 대해 최근 경기 적재 또는 티어 갱신을 실행합니다."
         )
         helper.setWordWrap(True)
         layout.addWidget(helper)
@@ -191,17 +193,16 @@ class RiotLoaderWidget(QWidget):
         action_row = QGridLayout()
         self.store_selected_btn = QPushButton("선택 계정 적재")
         self.store_selected_btn.clicked.connect(self.store_selected_accounts)
-        self.refresh_tier_selected_btn = QPushButton("선택 계정 티어 갱신")
-        self.refresh_tier_selected_btn.clicked.connect(self.refresh_selected_account_tiers)
+        self.refresh_tier_btn = QPushButton("선택 계정 티어 갱신")
+        self.refresh_tier_btn.clicked.connect(self.refresh_selected_account_tiers)
         action_row.addWidget(self.store_selected_btn, 0, 0)
-        action_row.addWidget(self.refresh_tier_selected_btn, 0, 1)
+        action_row.addWidget(self.refresh_tier_btn, 0, 1)
         layout.addLayout(action_row)
         return box
 
     def _build_result_group(self):
         box = QGroupBox("응답 결과")
         layout = QVBoxLayout(box)
-        layout.setSpacing(10)
 
         self.status_label = QLabel("준비 완료")
         self.status_label.setWordWrap(True)
@@ -212,45 +213,19 @@ class RiotLoaderWidget(QWidget):
         layout.addWidget(self.result_box, 1)
         return box
 
-    def refresh_api_urls(self):
-        self.api_base_url = load_server_base_url().rstrip("/")
-        self.server_url_label.setText(f"서버 주소: {self.api_base_url}")
-        self.puuid_url = f"{self.api_base_url}/get_puuid"
-        self.match_ids_url = f"{self.api_base_url}/get_match_ids"
-        self.match_detail_url = f"{self.api_base_url}/get_match_detail"
-        self.store_matches_url = f"{self.api_base_url}/store_recent_matches"
-        self.list_accounts_url = f"{self.api_base_url}/accounts"
-        self.search_accounts_url = f"{self.api_base_url}/accounts/search"
-        self.store_selected_accounts_url = (
-            f"{self.api_base_url}/store_recent_matches/by-stored-accounts"
-        )
-        self.refresh_selected_tiers_url = (
-            f"{self.api_base_url}/refresh_account_tier/by-stored-accounts"
-        )
-
     def _update_session_badge(self):
         username = self.current_user.get("username") or "unknown"
         role = "관리자" if self.current_user.get("is_admin") else "일반 사용자"
         self.session_label.setText(f"로그인 사용자: {username} ({role})")
 
-    def _auth_headers(self):
-        token = team_app.load_auth_token().strip()
-        headers = {"Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        return headers
+    def _update_server_label(self):
+        self.api.refresh_urls()
+        self.server_url_label.setText(f"서버 주소: {self.api.api_base_url}")
 
-    def _request(self, method, url, *, payload=None, timeout=30):
-        response = requests.request(
-            method,
-            url,
-            json=payload,
-            headers=self._auth_headers(),
-            timeout=timeout,
-        )
-        data = self._show_response(response)
+    def _show_response(self, response, data):
+        text = self.api.format_response_text(response, data)
+        self.result_box.setText(text)
         if response.status_code == 401:
-            team_app.clear_auth_token()
             self.status_label.setText("인증이 만료되었습니다. 다시 로그인해주세요.")
         elif response.status_code == 403:
             self.status_label.setText("이 작업은 관리자 권한이 필요합니다.")
@@ -258,52 +233,30 @@ class RiotLoaderWidget(QWidget):
             self.status_label.setText(f"요청 완료: HTTP {response.status_code}")
         else:
             self.status_label.setText(f"요청 실패: HTTP {response.status_code}")
-        return response, data
 
-    def _show_response(self, response):
-        try:
-            data = response.json()
-        except Exception:
-            self.result_box.setText(f"HTTP {response.status_code}\n\n{response.text}")
-            return None
-
-        self.result_box.setText(
-            f"HTTP {response.status_code}\n\n{pformat(data, sort_dicts=False)}"
-        )
-        return data
-
-    def _set_result_data(self, data):
-        self.result_box.setText(pformat(data, sort_dicts=False))
-
-    def _set_validation_message(self, message):
+    def _set_message(self, message):
         self.status_label.setText(message)
         self.result_box.setText(message)
 
     def fetch_puuid(self):
-        self.refresh_api_urls()
-
+        self._update_server_label()
         game_name = self.game_name_input.text().strip()
         tag_line = self.tag_line_input.text().strip()
         api_key = self.api_key_input.text().strip()
 
         if not game_name:
-            self._set_validation_message("게임 닉네임을 먼저 입력해주세요.")
+            self._set_message("게임 닉네임을 먼저 입력해주세요.")
             return
         if not tag_line:
-            self._set_validation_message("태그를 먼저 입력해주세요.")
+            self._set_message("태그를 먼저 입력해주세요.")
             return
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "game_name": game_name,
-            "tag_line": tag_line,
-        }
-
         try:
-            response, data = self._request("POST", self.puuid_url, payload=payload, timeout=30)
+            response, data = self.api.fetch_puuid(api_key, game_name, tag_line)
+            self._show_response(response, data)
             if response.status_code == 200 and data and "puuid" in data:
                 self.current_puuid = data["puuid"]
                 self.current_match_ids = []
@@ -311,117 +264,94 @@ class RiotLoaderWidget(QWidget):
                 self.current_puuid = ""
                 self.current_match_ids = []
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def fetch_match_ids(self):
-        self.refresh_api_urls()
-
+        self._update_server_label()
         api_key = self.api_key_input.text().strip()
         count = self.count_input.value()
 
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
         if not self.current_puuid:
-            self._set_validation_message("먼저 PUUID를 조회해주세요.")
+            self._set_message("먼저 PUUID를 조회해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "puuid": self.current_puuid,
-            "count": count,
-        }
-
         try:
-            response, data = self._request("POST", self.match_ids_url, payload=payload, timeout=30)
+            response, data = self.api.fetch_match_ids(api_key, self.current_puuid, count)
+            self._show_response(response, data)
             if response.status_code == 200 and data and "match_ids" in data:
                 self.current_match_ids = data["match_ids"]
             else:
                 self.current_match_ids = []
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def fetch_match_detail(self):
-        self.refresh_api_urls()
-
+        self._update_server_label()
         api_key = self.api_key_input.text().strip()
-
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
         if not self.current_match_ids:
-            self._set_validation_message("먼저 매치 ID를 조회해주세요.")
+            self._set_message("먼저 매치 ID를 조회해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "match_id": self.current_match_ids[0],
-        }
-
         try:
-            self._request("POST", self.match_detail_url, payload=payload, timeout=30)
+            response, data = self.api.fetch_match_detail(api_key, self.current_match_ids[0])
+            self._show_response(response, data)
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def store_recent_matches(self):
-        self.refresh_api_urls()
-
+        self._update_server_label()
         game_name = self.game_name_input.text().strip()
         tag_line = self.tag_line_input.text().strip()
         api_key = self.api_key_input.text().strip()
         count = self.count_input.value()
 
         if not game_name:
-            self._set_validation_message("게임 닉네임을 먼저 입력해주세요.")
+            self._set_message("게임 닉네임을 먼저 입력해주세요.")
             return
         if not tag_line:
-            self._set_validation_message("태그를 먼저 입력해주세요.")
+            self._set_message("태그를 먼저 입력해주세요.")
             return
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "game_name": game_name,
-            "tag_line": tag_line,
-            "count": count,
-        }
-
         try:
-            self._request("POST", self.store_matches_url, payload=payload, timeout=60)
+            response, data = self.api.store_recent_matches(api_key, game_name, tag_line, count)
+            self._show_response(response, data)
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def search_stored_accounts(self):
-        self.refresh_api_urls()
+        self._update_server_label()
         keyword = self.account_keyword_input.text().strip()
-
         if not keyword:
-            self._set_validation_message("저장된 계정을 검색할 키워드를 입력해주세요.")
+            self._set_message("저장된 계정을 검색할 키워드를 입력해주세요.")
             return
 
-        url = f"{self.search_accounts_url}?{urlencode({'keyword': keyword, 'limit': ACCOUNT_SEARCH_LIMIT})}"
-
         try:
-            response, data = self._request("GET", url, timeout=30)
+            response, data = self.api.search_accounts(keyword)
+            self._show_response(response, data)
             self._populate_account_list(response, data, "검색된 저장 계정이 없습니다.")
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def load_all_stored_accounts(self):
-        self.refresh_api_urls()
-        url = f"{self.list_accounts_url}?{urlencode({'limit': ACCOUNT_SEARCH_LIMIT})}"
-
+        self._update_server_label()
         try:
-            response, data = self._request("GET", url, timeout=30)
+            response, data = self.api.list_accounts()
+            self._show_response(response, data)
             self._populate_account_list(response, data, "저장된 계정이 없습니다.")
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def _populate_account_list(self, response, data, empty_message):
         self.account_list.clear()
-
         if response.status_code != 200 or not data:
             return
 
@@ -437,12 +367,7 @@ class RiotLoaderWidget(QWidget):
             self.account_list.addItem(item)
 
         if self.account_list.count() == 0:
-            self.result_box.setText(empty_message)
-            self.status_label.setText(empty_message)
-        else:
-            self.status_label.setText(
-                f"저장된 계정 {self.account_list.count()}개를 불러왔습니다."
-            )
+            self._set_message(empty_message)
 
     def fill_manual_fields_from_item(self, item):
         account = item.data(Qt.UserRole) or {}
@@ -468,88 +393,72 @@ class RiotLoaderWidget(QWidget):
             item = self.account_list.item(index)
             if item.checkState() != Qt.Checked:
                 continue
-
             account = item.data(Qt.UserRole) or {}
             game_name = (account.get("game_name") or "").strip()
             tag_line = (account.get("tag_line") or "").strip()
             if not game_name or not tag_line:
                 continue
-
             key = (game_name.lower(), tag_line.lower())
             if key in seen:
                 continue
-
             seen.add(key)
             accounts.append({"game_name": game_name, "tag_line": tag_line})
 
         return accounts
 
     def store_selected_accounts(self):
-        self.refresh_api_urls()
+        self._update_server_label()
         api_key = self.api_key_input.text().strip()
         count = self.count_input.value()
         accounts = self._get_checked_accounts()
 
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
         if not accounts:
-            self._set_validation_message("적재할 저장 계정을 하나 이상 선택해주세요.")
+            self._set_message("적재할 저장 계정을 하나 이상 선택해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "count": count,
-            "accounts": accounts,
-        }
-
         try:
-            response, data = self._request(
-                "POST",
-                self.store_selected_accounts_url,
-                payload=payload,
-                timeout=300,
-            )
-            if response.status_code == 200 and data:
-                self._set_result_data(data)
+            response, data = self.api.store_selected_accounts(api_key, count, accounts)
+            self._show_response(response, data)
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
 
     def refresh_selected_account_tiers(self):
-        self.refresh_api_urls()
+        self._update_server_label()
         api_key = self.api_key_input.text().strip()
         accounts = self._get_checked_accounts()
 
         if not api_key:
-            self._set_validation_message("Riot API Key를 먼저 입력해주세요.")
+            self._set_message("Riot API Key를 먼저 입력해주세요.")
             return
         if not accounts:
-            self._set_validation_message("티어를 갱신할 저장 계정을 하나 이상 선택해주세요.")
+            self._set_message("티어를 갱신할 저장 계정을 하나 이상 선택해주세요.")
             return
 
-        payload = {
-            "api_key": api_key,
-            "accounts": accounts,
-        }
-
         try:
-            response, data = self._request(
-                "POST",
-                self.refresh_selected_tiers_url,
-                payload=payload,
-                timeout=300,
-            )
-            if response.status_code == 200 and data:
-                self._set_result_data(data)
+            response, data = self.api.refresh_selected_tiers(api_key, accounts)
+            self._show_response(response, data)
+            if response.status_code == 200:
                 self.load_all_stored_accounts()
         except Exception as exc:
-            self._set_validation_message(f"요청 오류: {exc}")
+            self._set_message(f"요청 오류: {exc}")
+
+    def open_scheduler_dialog(self):
+        if self.scheduler_dialog is None:
+            self.scheduler_dialog = RiotLoaderSchedulerDialog(self)
+        self.scheduler_dialog.api_key_input.setText(self.api_key_input.text())
+        self.scheduler_dialog.count_input.setValue(self.count_input.value())
+        self.scheduler_dialog.show()
+        self.scheduler_dialog.raise_()
+        self.scheduler_dialog.activateWindow()
 
     def reauthenticate(self):
         current_user = ensure_admin_session(self)
         if current_user:
             self.current_user = current_user
-            self.refresh_api_urls()
+            self._update_server_label()
             self._update_session_badge()
             self.status_label.setText("관리자 세션을 새로고침했습니다.")
 
