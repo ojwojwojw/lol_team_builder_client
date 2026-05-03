@@ -1,11 +1,15 @@
 from domain.team_builder import calc_position_fit_bonus, calc_recent_form_bonus
 
 
+def _format_tier_detail(value):
+    return "-" if value in (None, "", "-") else str(value)
+
+
 def format_team_result(team1, team2):
     def format_team(team):
         lines = []
         for pos, user in team.items():
-            detail = user.get("tier_detail", 2)
+            detail = _format_tier_detail(user.get("tier_detail", 2))
             form = ""
             if user.get("recent_match_count"):
                 form_score = calc_recent_form_bonus(user) * 100
@@ -33,8 +37,8 @@ def format_warnings(warnings):
         t2 = warning.get("team2", {})
         lines.append(f"[{warning.get('position', '?')}]")
         lines.append(
-            f"  {t1.get('name', '?')} ({t1.get('tier', '?')} / {t1.get('detail', 2)})"
-            f" vs {t2.get('name', '?')} ({t2.get('tier', '?')} / {t2.get('detail', 2)})"
+            f"  {t1.get('name', '?')} ({t1.get('tier', '?')} / {_format_tier_detail(t1.get('detail', 2))})"
+            f" vs {t2.get('name', '?')} ({t2.get('tier', '?')} / {_format_tier_detail(t2.get('detail', 2))})"
         )
         lines.append(
             f"  차이: {warning.get('diff', 0)} / 허용치: {warning.get('limit', 0)}"

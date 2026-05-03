@@ -66,6 +66,15 @@ class MatchReadQuery:
                 puuid,
                 game_name,
                 tag_line,
+                summoner_id,
+                summoner_level,
+                profile_icon_id,
+                queue_type,
+                tier,
+                rank,
+                league_points,
+                wins,
+                losses,
                 fetched_at,
                 raw_json
             FROM riot_account
@@ -84,6 +93,15 @@ class MatchReadQuery:
                 puuid,
                 game_name,
                 tag_line,
+                summoner_id,
+                summoner_level,
+                profile_icon_id,
+                queue_type,
+                tier,
+                rank,
+                league_points,
+                wins,
+                losses,
                 fetched_at,
                 raw_json
             FROM riot_account
@@ -102,6 +120,15 @@ class MatchReadQuery:
                 puuid,
                 game_name,
                 tag_line,
+                summoner_id,
+                summoner_level,
+                profile_icon_id,
+                queue_type,
+                tier,
+                rank,
+                league_points,
+                wins,
+                losses,
                 fetched_at,
                 raw_json
             FROM riot_account

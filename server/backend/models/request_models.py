@@ -47,3 +47,31 @@ class StoreStoredAccountsRequest(BaseModel):
     api_key: str
     count: int = 5
     accounts: list[StoredRiotAccountRef]
+
+
+class RefreshStoredAccountsRequest(BaseModel):
+    """Input body for batch refreshing tier data for stored riot accounts."""
+
+    api_key: str
+    accounts: list[StoredRiotAccountRef]
+
+
+class AuthBootstrapRequest(BaseModel):
+    """Input body for one-time admin bootstrap."""
+
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    """Input body for login."""
+
+    username: str
+    password: str
+
+
+class CreateUserRequest(BaseModel):
+    """Input body for admin-created member accounts."""
+
+    username: str
+    password: str

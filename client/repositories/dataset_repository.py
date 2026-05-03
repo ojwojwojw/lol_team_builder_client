@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 from domain.constants import (
+    DEFAULT_BUILD_WEIGHTS,
     DEFAULT_SERVER_BASE_URL,
     DEFAULT_THEME_MODE,
     DEFAULT_TIER_SCORE,
@@ -25,8 +26,11 @@ CONFIG_FILE = DATA_DIR / "config.json"
 def _default_config():
     return {
         "tier_score": DEFAULT_TIER_SCORE,
+        "build_weights": DEFAULT_BUILD_WEIGHTS,
         "server_base_url": DEFAULT_SERVER_BASE_URL,
         "theme_mode": DEFAULT_THEME_MODE,
+        "auth_token": "",
+        "auth_username": "",
     }
 
 
@@ -64,8 +68,25 @@ def _load_raw_config():
         config.update(data)
 
     config["tier_score"] = _normalize_tier_score(config.get("tier_score"))
+    config["build_weights"] = _normalize_build_weights(config.get("build_weights"))
     config["theme_mode"] = normalize_theme_mode(config.get("theme_mode"))
     return config
+
+
+def _normalize_build_weights(weight_map):
+    normalized = dict(DEFAULT_BUILD_WEIGHTS)
+
+    if not isinstance(weight_map, dict):
+        return normalized
+
+    for key, default_value in DEFAULT_BUILD_WEIGHTS.items():
+        value = weight_map.get(key, default_value)
+        try:
+            normalized[key] = int(value)
+        except Exception:
+            normalized[key] = default_value
+
+    return normalized
 
 
 class DatasetRepository:
@@ -125,6 +146,16 @@ def save_config(score_map):
     _save_raw_config(config)
 
 
+def load_build_weights():
+    return _load_raw_config().get("build_weights", DEFAULT_BUILD_WEIGHTS)
+
+
+def save_build_weights(weight_map):
+    config = _load_raw_config()
+    config["build_weights"] = _normalize_build_weights(weight_map)
+    _save_raw_config(config)
+
+
 def load_server_base_url():
     return _load_raw_config().get("server_base_url", DEFAULT_SERVER_BASE_URL)
 
@@ -132,6 +163,32 @@ def load_server_base_url():
 def save_server_base_url(base_url):
     config = _load_raw_config()
     config["server_base_url"] = base_url
+    _save_raw_config(config)
+
+
+def load_auth_token():
+    return str(_load_raw_config().get("auth_token", "") or "")
+
+
+def save_auth_token(token):
+    config = _load_raw_config()
+    config["auth_token"] = str(token or "").strip()
+    _save_raw_config(config)
+
+
+def clear_auth_token():
+    config = _load_raw_config()
+    config["auth_token"] = ""
+    _save_raw_config(config)
+
+
+def load_auth_username():
+    return str(_load_raw_config().get("auth_username", "") or "")
+
+
+def save_auth_username(username):
+    config = _load_raw_config()
+    config["auth_username"] = str(username or "").strip()
     _save_raw_config(config)
 
 

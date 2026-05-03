@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from ..security import get_current_user
 from ..services.match_service import MatchService
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 match_service = MatchService()
 
 

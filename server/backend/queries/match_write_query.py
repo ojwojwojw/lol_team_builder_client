@@ -18,21 +18,79 @@ class MatchWriteQuery:
         self.cursor = connection.cursor()
 
     def store_account(self, account: dict) -> None:
-        """Insert account data once per puuid if it is not already stored."""
+        """Insert or refresh one riot_account row with ranked metadata."""
         self.cursor.execute(
             """
-            INSERT INTO riot_account (puuid, game_name, tag_line, fetched_at, raw_json)
-            SELECT ?, ?, ?, CURRENT_TIMESTAMP, ?
-            WHERE NOT EXISTS (
-                SELECT 1 FROM riot_account WHERE puuid = ?
+            INSERT INTO riot_account (
+                puuid,
+                game_name,
+                tag_line,
+                summoner_id,
+                summoner_level,
+                profile_icon_id,
+                queue_type,
+                tier,
+                rank,
+                league_points,
+                wins,
+                losses,
+                fetched_at,
+                raw_json
             )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT(puuid) DO UPDATE SET
+                game_name = excluded.game_name,
+                tag_line = excluded.tag_line,
+                summoner_id = COALESCE(excluded.summoner_id, riot_account.summoner_id),
+                summoner_level = COALESCE(excluded.summoner_level, riot_account.summoner_level),
+                profile_icon_id = COALESCE(excluded.profile_icon_id, riot_account.profile_icon_id),
+                queue_type = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.queue_type
+                    ELSE excluded.queue_type
+                END,
+                tier = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.tier
+                    ELSE excluded.tier
+                END,
+                rank = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.rank
+                    ELSE excluded.rank
+                END,
+                league_points = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.league_points
+                    ELSE excluded.league_points
+                END,
+                wins = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.wins
+                    ELSE excluded.wins
+                END,
+                losses = CASE
+                    WHEN json_extract(excluded.raw_json, '$.tier_sync_warning.error') IS NOT NULL
+                        THEN riot_account.losses
+                    ELSE excluded.losses
+                END,
+                fetched_at = CURRENT_TIMESTAMP,
+                raw_json = excluded.raw_json
             """,
             (
                 account.get("puuid"),
-                account.get("gameName"),
-                account.get("tagLine"),
+                account.get("game_name"),
+                account.get("tag_line"),
+                account.get("summoner_id"),
+                account.get("summoner_level"),
+                account.get("profile_icon_id"),
+                account.get("queue_type"),
+                account.get("tier"),
+                account.get("rank"),
+                account.get("league_points"),
+                account.get("wins"),
+                account.get("losses"),
                 to_json_text(account),
-                account.get("puuid"),
             ),
         )
 

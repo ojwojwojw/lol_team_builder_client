@@ -17,6 +17,13 @@ POSITION_LABEL_MAP = {
     "": ANY_POSITION,
 }
 
+RANK_DETAIL_MAP = {
+    "I": 1,
+    "II": 2,
+    "III": 3,
+    "IV": 4,
+}
+
 
 def map_position_label(position):
     value = (position or "").strip().upper()
@@ -169,14 +176,29 @@ def build_user_profile(account, matches=None, existing_user=None):
             [ANY_POSITION, ANY_POSITION, ANY_POSITION],
         )
 
+    account_tier = normalize_tier_name(
+        account.get("tier") or existing_user.get("tier", "언랭크")
+    )
+    account_rank = str(account.get("rank") or "").strip().upper()
+    if account_tier == "언랭크":
+        account_tier_detail = None
+    else:
+        account_tier_detail = RANK_DETAIL_MAP.get(
+            account_rank,
+            existing_user.get("tier_detail", 2),
+        )
+
     return {
         "selected": existing_user.get("selected", True),
         "name": account.get("game_name", ""),
-        "tier": normalize_tier_name(existing_user.get("tier", "실버")),
-        "tier_detail": existing_user.get("tier_detail", 2),
+        "tier": account_tier,
+        "tier_detail": account_tier_detail,
         "positions": [normalize_position_name(position) for position in positions],
         "account_tag_line": account.get("tag_line", ""),
         "account_puuid": account.get("puuid", ""),
+        "account_queue_type": account.get("queue_type"),
+        "account_rank": account.get("rank"),
+        "account_league_points": account.get("league_points"),
         "recent_match_count": summary["match_count"],
         "recent_wins": summary["wins"],
         "recent_losses": summary["losses"],
@@ -196,8 +218,13 @@ def normalize_match_detail(detail):
     participants = []
 
     for participant in detail.get("participants", []):
+        display_name = (
+            participant.get("riot_id_game_name")
+            or participant.get("summoner_name")
+            or "-"
+        )
         participants.append({
-            "summoner_name": participant.get("summoner_name", "-"),
+            "summoner_name": display_name,
             "champion_name": participant.get("champion_name", "-"),
             "position": map_position_label(
                 participant.get("team_position")

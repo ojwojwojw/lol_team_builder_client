@@ -1,3 +1,14 @@
+def _parse_tier_detail(detail_cb):
+    if detail_cb is None:
+        return None
+
+    text = detail_cb.currentText().strip()
+    if text in {"", "-"}:
+        return None
+
+    return int(text)
+
+
 def _get_row_meta(table, row):
     chk = table.cellWidget(row, 0)
     if not chk:
@@ -26,7 +37,7 @@ def extract_table_data(table):
             "selected": chk.isChecked() if chk else False,
             "name": name_edit.text().strip(),
             "tier": tier_cb.currentText() if tier_cb else "",
-            "tier_detail": int(detail_cb.currentText()) if detail_cb else 1,
+            "tier_detail": _parse_tier_detail(detail_cb),
             "positions": [
                 p1.currentText() if p1 else "",
                 p2.currentText() if p2 else "",
@@ -64,7 +75,7 @@ def extract_selected_users(table):
         user.update({
             "name": name,
             "tier": tier_cb.currentText(),
-            "tier_detail": int(detail_cb.currentText()),
+            "tier_detail": _parse_tier_detail(detail_cb),
             "positions": [
                 p1.currentText(),
                 p2.currentText(),

@@ -27,10 +27,18 @@ from ui.theme import TIER_COLOR, get_theme_tokens
 VISIBLE_USER_KEYS = {"selected", "name", "tier", "tier_detail", "positions"}
 
 
+def _read_detail_value(detail_cb):
+    text = detail_cb.currentText().strip()
+    if text in {"", "-"}:
+        return None
+    return int(text)
+
+
 class UserTableWidget(QWidget):
     toggle_clicked = pyqtSignal()
     add_clicked = pyqtSignal()
     delete_clicked = pyqtSignal()
+    couple_group_clicked = pyqtSignal()
     save_clicked = pyqtSignal()
 
     def __init__(self):
@@ -86,11 +94,13 @@ class UserTableWidget(QWidget):
         self.toggle_btn = QPushButton("전체 선택/해제")
         self.add_btn = QPushButton("행 추가")
         self.delete_btn = QPushButton("행 삭제")
+        self.couple_group_btn = QPushButton("커플 그룹")
         self.save_btn = QPushButton("저장")
 
         btns.addWidget(self.toggle_btn)
         btns.addWidget(self.add_btn)
         btns.addWidget(self.delete_btn)
+        btns.addWidget(self.couple_group_btn)
         btns.addWidget(self.save_btn)
 
         layout.addWidget(self.table)
@@ -101,6 +111,7 @@ class UserTableWidget(QWidget):
         self.toggle_btn.clicked.connect(self.toggle_clicked.emit)
         self.add_btn.clicked.connect(self.add_clicked.emit)
         self.delete_btn.clicked.connect(self.delete_clicked.emit)
+        self.couple_group_btn.clicked.connect(self.couple_group_clicked.emit)
         self.save_btn.clicked.connect(self.save_clicked.emit)
 
     def apply_theme(self, theme_mode):
@@ -171,7 +182,7 @@ class UserTableWidget(QWidget):
             "selected": chk.isChecked(),
             "name": name_edit.text().strip(),
             "tier": tier_cb.currentText(),
-            "tier_detail": int(detail_cb.currentText()),
+            "tier_detail": _read_detail_value(detail_cb),
             "positions": [
                 p1.currentText(),
                 p2.currentText(),
@@ -179,6 +190,59 @@ class UserTableWidget(QWidget):
             ],
         })
         return user
+
+    def get_users_snapshot(self):
+        users = []
+
+        for row in range(self.table.rowCount()):
+            name_edit = self.table.cellWidget(row, 1)
+            tier_cb = self.table.cellWidget(row, 2)
+            detail_cb = self.table.cellWidget(row, 3)
+            p1 = self.table.cellWidget(row, 4)
+            p2 = self.table.cellWidget(row, 5)
+            p3 = self.table.cellWidget(row, 6)
+            chk = self.table.cellWidget(row, 0)
+
+            if not all([name_edit, tier_cb, detail_cb, p1, p2, p3, chk]):
+                continue
+
+            user = self._get_row_meta(row)
+            user.update({
+                "selected": chk.isChecked(),
+                "name": name_edit.text().strip(),
+                "tier": tier_cb.currentText(),
+                "tier_detail": _read_detail_value(detail_cb),
+                "positions": [
+                    p1.currentText(),
+                    p2.currentText(),
+                    p3.currentText(),
+                ],
+            })
+            users.append(user)
+
+        return users
+
+    def apply_couple_groups(self, group_map):
+        normalized = {
+            (name or "").strip(): (group_name or "").strip()
+            for name, group_name in (group_map or {}).items()
+        }
+
+        for row in range(self.table.rowCount()):
+            name_edit = self.table.cellWidget(row, 1)
+            if not name_edit:
+                continue
+
+            name = name_edit.text().strip()
+            meta = self._get_row_meta(row)
+            group_name = normalized.get(name, "")
+
+            if group_name:
+                meta["couple_group"] = group_name
+            else:
+                meta.pop("couple_group", None)
+
+            self._set_row_meta(row, meta)
 
     def add_user(self, user):
         try:
@@ -217,12 +281,16 @@ class UserTableWidget(QWidget):
 
             tier = QComboBox()
             tier.addItems(TIER_LIST)
-            tier.setCurrentText(normalize_tier_name(user.get("tier", "실버")))
+            tier.setCurrentText(normalize_tier_name(user.get("tier", "언랭크")))
             self.table.setCellWidget(row, 2, tier)
 
             detail = QComboBox()
-            detail.addItems(["1", "2", "3", "4"])
-            detail.setCurrentText(str(user.get("tier_detail", 2)))
+            detail.addItems(["-", "1", "2", "3", "4"])
+            tier_detail = user.get("tier_detail")
+            if tier.currentText() == "언랭크" or tier_detail in (None, "", "-"):
+                detail.setCurrentText("-")
+            else:
+                detail.setCurrentText(str(tier_detail))
             self.table.setCellWidget(row, 3, detail)
 
             positions = [
@@ -246,7 +314,7 @@ class UserTableWidget(QWidget):
 
             self._bind_position_filters(position_combos)
             self.apply_tier_style(tier, row == self._selected_row)
-            self.bind_tier_change(tier)
+            self.bind_tier_change(tier, detail)
             if not self._is_building_row:
                 self.refresh_row_highlight()
         except Exception as exc:
@@ -388,10 +456,14 @@ class UserTableWidget(QWidget):
             """
         )
 
-    def bind_tier_change(self, combo):
+    def bind_tier_change(self, combo, detail_combo):
         def update():
             if self._is_building_row:
                 return
+            if combo.currentText() == "언랭크":
+                detail_combo.setCurrentText("-")
+            elif detail_combo.currentText() == "-":
+                detail_combo.setCurrentText("2")
             current_row = self._selected_row
             if current_row < 0:
                 self.apply_tier_style(combo, False)

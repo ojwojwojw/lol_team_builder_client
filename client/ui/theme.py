@@ -2,6 +2,7 @@ from domain.constants import DEFAULT_THEME_MODE, normalize_theme_mode
 
 
 TIER_COLOR = {
+    "언랭크": "#95a5a6",
     "아이언": "#7f8c8d",
     "브론즈": "#c17f59",
     "실버": "#bdc3c7",

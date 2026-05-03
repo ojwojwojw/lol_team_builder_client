@@ -1,16 +1,18 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 
 from ..models.request_models import (
     MatchDetailRequest,
     MatchIdsRequest,
+    RefreshStoredAccountsRequest,
     RiotAccountRequest,
     StoreStoredAccountsRequest,
     StoreRecentMatchesRequest,
 )
+from ..security import get_current_user
 from ..services.riot_service import RiotService
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_current_user)])
 # Controller only handles HTTP input/output.
 # Business flow stays in the service layer.
 riot_service = RiotService()
@@ -42,6 +44,27 @@ def store_recent_matches(req: StoreRecentMatchesRequest = Body(...)):
     game_name = req.game_name.strip().rstrip("#")
     tag_line = req.tag_line.strip().lstrip("#")
     return riot_service.store_recent_matches(game_name, tag_line, req.api_key, req.count)
+
+
+@router.post("/refresh_account_tier")
+def refresh_account_tier(req: RiotAccountRequest = Body(...)):
+    """Refresh and store only tier-related account metadata for one Riot ID."""
+    game_name = req.game_name.strip().rstrip("#")
+    tag_line = req.tag_line.strip().lstrip("#")
+    return riot_service.refresh_account_tier(game_name, tag_line, req.api_key)
+
+
+@router.post("/refresh_account_tier/by-stored-accounts")
+def refresh_account_tier_by_stored_accounts(req: RefreshStoredAccountsRequest = Body(...)):
+    """Refresh and store only tier metadata for selected riot_account rows."""
+    accounts = [
+        {
+            "game_name": account.game_name.strip().rstrip("#"),
+            "tag_line": account.tag_line.strip().lstrip("#"),
+        }
+        for account in req.accounts
+    ]
+    return riot_service.refresh_account_tiers_for_accounts(accounts, req.api_key)
 
 
 @router.post("/store_recent_matches/by-stored-accounts")

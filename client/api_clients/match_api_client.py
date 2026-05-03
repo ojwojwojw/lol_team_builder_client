@@ -3,7 +3,11 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from repositories.dataset_repository import load_server_base_url
+from repositories.dataset_repository import (
+    clear_auth_token,
+    load_auth_token,
+    load_server_base_url,
+)
 
 
 class MatchApiClient:
@@ -36,10 +40,55 @@ class MatchApiClient:
         encoded_match_id = quote(match_id, safe="")
         return self._get(f"/matches/{encoded_match_id}")
 
+    def login(self, username, password):
+        """Call POST /auth/login."""
+        return self._post(
+            "/auth/login",
+            {"username": username, "password": password},
+            use_auth=False,
+        )
+
+    def bootstrap_admin(self, username, password):
+        """Call POST /auth/bootstrap-admin."""
+        return self._post(
+            "/auth/bootstrap-admin",
+            {"username": username, "password": password},
+            use_auth=False,
+        )
+
+    def get_me(self):
+        """Call GET /auth/me."""
+        return self._get("/auth/me")
+
     def _get(self, path, params=None):
         query = f"?{urlencode(params)}" if params else ""
         url = f"{self.base_url}{path}{query}"
-        request = Request(url, method="GET")
+        request = Request(url, method="GET", headers=self._build_headers())
+        return self._send(request)
+
+    def _post(self, path, payload=None, use_auth=True):
+        url = f"{self.base_url}{path}"
+        body = json.dumps(payload or {}).encode("utf-8")
+        request = Request(
+            url,
+            data=body,
+            method="POST",
+            headers=self._build_headers(use_auth=use_auth, include_json=True),
+        )
+        return self._send(request)
+
+    def _build_headers(self, use_auth=True, include_json=False):
+        headers = {}
+        if include_json:
+            headers["Content-Type"] = "application/json"
+
+        if use_auth:
+            token = load_auth_token().strip()
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+        return headers
+
+    def _send(self, request):
 
         try:
             with urlopen(request, timeout=self.timeout) as response:
@@ -47,6 +96,8 @@ class MatchApiClient:
                 return json.loads(body)
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code == 401:
+                clear_auth_token()
             raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(

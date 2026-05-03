@@ -112,6 +112,11 @@ class RiotLoaderWidget(QWidget):
         self.store_selected_btn = QPushButton("선택 계정만 적재")
         self.store_selected_btn.clicked.connect(self.store_selected_accounts)
         selection_row.addWidget(self.store_selected_btn)
+
+        self.refresh_tier_selected_btn = QPushButton("선택 계정 티어만 갱신")
+        self.refresh_tier_selected_btn.clicked.connect(self.refresh_selected_account_tiers)
+        selection_row.addWidget(self.refresh_tier_selected_btn)
+
         selection_row.addStretch(1)
         layout.addLayout(selection_row)
 
@@ -138,6 +143,9 @@ class RiotLoaderWidget(QWidget):
         self.search_accounts_url = f"{self.api_base_url}/accounts/search"
         self.store_selected_accounts_url = (
             f"{self.api_base_url}/store_recent_matches/by-stored-accounts"
+        )
+        self.refresh_selected_tiers_url = (
+            f"{self.api_base_url}/refresh_account_tier/by-stored-accounts"
         )
 
     def _show_response(self, response):
@@ -389,6 +397,36 @@ class RiotLoaderWidget(QWidget):
             data = self._show_response(response)
             if response.status_code == 200 and data:
                 self._set_result_data(data)
+        except Exception as exc:
+            self.result_box.setText(f"오류: {exc}")
+
+    def refresh_selected_account_tiers(self):
+        self.refresh_api_urls()
+        api_key = self.api_key_input.text().strip()
+        accounts = self._get_checked_accounts()
+
+        if not api_key:
+            self.result_box.setText("Riot API Key를 입력해주세요.")
+            return
+        if not accounts:
+            self.result_box.setText("티어를 갱신할 저장 계정을 하나 이상 체크해주세요.")
+            return
+
+        payload = {
+            "api_key": api_key,
+            "accounts": accounts,
+        }
+
+        try:
+            response = requests.post(
+                self.refresh_selected_tiers_url,
+                json=payload,
+                timeout=300,
+            )
+            data = self._show_response(response)
+            if response.status_code == 200 and data:
+                self._set_result_data(data)
+                self.load_all_stored_accounts()
         except Exception as exc:
             self.result_box.setText(f"오류: {exc}")
 

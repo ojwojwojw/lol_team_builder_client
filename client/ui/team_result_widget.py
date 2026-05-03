@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 
 from domain.constants import DEFAULT_THEME_MODE, POSITIONS
 from domain.team_builder import calc_position_fit_bonus, calc_recent_form_bonus
+from ui.score_breakdown_dialog import ScoreBreakdownDialog
 from ui.theme import TIER_COLOR, get_theme_tokens
 
 
@@ -26,6 +27,8 @@ class TeamResultWidget(QWidget):
         super().__init__()
         self.result_text = ""
         self.theme_mode = DEFAULT_THEME_MODE
+        self.score_breakdown_rows = []
+        self.breakdown_dialog = ScoreBreakdownDialog(self)
         self._create_ui()
         self._connect_signals()
         self.apply_theme(self.theme_mode)
@@ -36,8 +39,11 @@ class TeamResultWidget(QWidget):
         top_btns = QHBoxLayout()
         self.generate_btn = QPushButton("팀 생성")
         self.copy_btn = QPushButton("복사")
+        self.breakdown_btn = QPushButton("조합 선택 근거")
+        self.breakdown_btn.setEnabled(False)
         top_btns.addWidget(self.generate_btn)
         top_btns.addWidget(self.copy_btn)
+        top_btns.addWidget(self.breakdown_btn)
         layout.addLayout(top_btns)
 
         teams_layout = QHBoxLayout()
@@ -66,6 +72,7 @@ class TeamResultWidget(QWidget):
     def _connect_signals(self):
         self.generate_btn.clicked.connect(self.generate_clicked.emit)
         self.copy_btn.clicked.connect(self.copy_clicked.emit)
+        self.breakdown_btn.clicked.connect(self.open_breakdown_dialog)
         self.team1_table.cellClicked.connect(
             lambda row, _col: self._emit_account_click(self.team1_table, row)
         )
@@ -123,7 +130,11 @@ class TeamResultWidget(QWidget):
 
         self.team1_score_label.setText(f"팀 1 점수: {round(result['t1_score'], 2)}")
         self.team2_score_label.setText(f"팀 2 점수: {round(result['t2_score'], 2)}")
+        self.team1_score_label.setToolTip(result.get("t1_score_tooltip", ""))
+        self.team2_score_label.setToolTip(result.get("t2_score_tooltip", ""))
         self.diff_label.setText(f"점수 차이: {round(result['diff'], 2)}")
+        self.score_breakdown_rows = result.get("score_breakdown_rows", [])
+        self.breakdown_btn.setEnabled(bool(self.score_breakdown_rows))
 
     def fill(self, table, assign):
         tokens = get_theme_tokens(self.theme_mode)
@@ -142,7 +153,8 @@ class TeamResultWidget(QWidget):
             user = assign[position]
             name = user["name"]
             tier = user["tier"]
-            detail = user.get("tier_detail", 2)
+            detail = user.get("tier_detail")
+            detail_text = "-" if detail in (None, "", "-") else str(detail)
 
             name_item = QTableWidgetItem(name)
             name_item.setBackground(QColor(tokens["result_name_bg"]))
@@ -157,7 +169,7 @@ class TeamResultWidget(QWidget):
             tier_item.setForeground(QBrush(QColor("#000000")))
             table.setItem(index, 2, tier_item)
 
-            detail_item = QTableWidgetItem(str(detail))
+            detail_item = QTableWidgetItem(detail_text)
             detail_item.setBackground(tier_color)
             detail_item.setForeground(QBrush(QColor("#000000")))
             table.setItem(index, 3, detail_item)
@@ -175,3 +187,9 @@ class TeamResultWidget(QWidget):
             fit_item = QTableWidgetItem(fit_text)
             fit_item.setForeground(QBrush(QColor(tokens["muted_text"])))
             table.setItem(index, 5, fit_item)
+
+    def open_breakdown_dialog(self):
+        if not self.score_breakdown_rows:
+            return
+        self.breakdown_dialog.set_rows(self.score_breakdown_rows)
+        self.breakdown_dialog.exec_()

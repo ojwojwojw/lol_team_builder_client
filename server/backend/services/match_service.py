@@ -1,4 +1,4 @@
-from ..database import get_connection
+from ..database import get_connection, init_db
 from ..queries.match_read_query import MatchReadQuery
 
 
@@ -7,6 +7,7 @@ class MatchService:
 
     def list_accounts(self, limit: int) -> dict:
         """Return stored riot_account rows ordered by latest fetch time."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         accounts = match_read_query.list_accounts(limit)
@@ -18,6 +19,7 @@ class MatchService:
 
     def get_accounts_by_game_name(self, game_name: str) -> dict:
         """Return stored riot_account rows for one game name."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         accounts = match_read_query.get_accounts_by_game_name(game_name)
@@ -30,6 +32,7 @@ class MatchService:
 
     def search_accounts_by_game_name(self, keyword: str, limit: int) -> dict:
         """Return stored riot_account rows using a game_name LIKE search."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         accounts = match_read_query.search_accounts_by_game_name(keyword, limit)
@@ -42,6 +45,7 @@ class MatchService:
 
     def get_recent_matches_by_puuid(self, puuid: str, limit: int) -> dict:
         """Return recent stored matches for one puuid."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         matches = match_read_query.get_recent_matches_by_puuid(puuid, limit)
@@ -56,6 +60,7 @@ class MatchService:
         self, game_name: str, tag_line: str, limit: int
     ) -> dict:
         """Return recent stored matches for one Riot ID."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         matches = match_read_query.get_recent_matches_by_riot_id(
@@ -73,6 +78,7 @@ class MatchService:
 
     def get_match_detail(self, match_id: str) -> dict:
         """Return one stored match with summary, teams, and participants."""
+        init_db()
         conn = get_connection()
         match_read_query = MatchReadQuery(conn)
         summary = match_read_query.get_match_summary(match_id)

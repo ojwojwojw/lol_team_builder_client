@@ -1,4 +1,5 @@
 TIER_LIST = [
+    "언랭크",
     "아이언",
     "브론즈",
     "실버",
@@ -35,6 +36,15 @@ DEFAULT_TIER_SCORE = {
     "마스터": 8,
 }
 
+DEFAULT_BUILD_WEIGHTS = {
+    "team_diff": 10,
+    "line_diff_total": 6,
+    "position_penalty": 3,
+    "bottom_penalty": 2,
+    "team_form_diff": 8,
+    "couple_group_penalty": 12,
+}
+
 DEFAULT_SERVER_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_THEME_MODE = "dark"
 ACCOUNT_SEARCH_LIMIT = 1000
@@ -45,6 +55,7 @@ THEME_LABELS = {
 }
 
 TIER_ALIASES = {
+    "unranked": "언랭크",
     "iron": "아이언",
     "bronze": "브론즈",
     "silver": "실버",
@@ -86,6 +97,9 @@ POSITION_ALIASES = {
 
 def normalize_tier_name(value):
     text = (value or "").strip()
+    if text == "언랭크":
+        return text
+
     if text in DEFAULT_TIER_SCORE:
         return text
 
@@ -97,7 +111,7 @@ def normalize_tier_name(value):
     if normalized:
         return normalized
 
-    return text or "실버"
+    return text or "언랭크"
 
 
 def normalize_position_name(value):

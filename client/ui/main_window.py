@@ -38,6 +38,8 @@ from application.recent_match_views import (
 from application.team_app import team_app
 from domain.constants import ACCOUNT_SEARCH_LIMIT, ANY_POSITION
 from ui.config_dialog import ConfigDialog
+from ui.couple_group_dialog import CoupleGroupDialog
+from ui.match_detail_dialog import MatchDetailDialog
 from ui.style_loader import load_style
 from ui.team_result_widget import TeamResultWidget
 from ui.theme import get_recent_summary_style
@@ -57,6 +59,8 @@ class MainWindow(QWidget):
         self.selected_match = None
         self.recent_matches = []
         self.theme_mode = team_app.load_theme_mode()
+        self.match_detail_dialog = MatchDetailDialog(self)
+        self.couple_group_dialog = CoupleGroupDialog(self)
 
         self._create_ui()
         self._connect_signals()
@@ -73,6 +77,44 @@ class MainWindow(QWidget):
             pass
 
         QMessageBox.critical(self, title, f"{exc}\n\n상세 로그: {log_path}")
+
+    def _format_account_tier_text(self, account):
+        tier = (account.get("tier") or "").strip()
+        rank = (account.get("rank") or "").strip()
+        league_points = account.get("league_points")
+        queue_type = (account.get("queue_type") or "").strip()
+
+        if not tier:
+            return "언랭크"
+
+        parts = [tier]
+        if rank:
+            parts.append(rank)
+        if league_points is not None:
+            parts.append(f"{league_points}LP")
+
+        queue_label = ""
+        if queue_type == "RANKED_SOLO_5x5":
+            queue_label = "솔랭"
+        elif queue_type == "RANKED_FLEX_SR":
+            queue_label = "자랭"
+
+        tier_text = " ".join(parts)
+        if queue_label:
+            return f"{tier_text} ({queue_label})"
+        return tier_text
+
+    def _format_account_list_label(self, account):
+        return (
+            f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
+            f" | {self._format_account_tier_text(account)}"
+        )
+
+    def _format_selected_account_label(self, account):
+        return (
+            f"선택 계정: {account.get('game_name', '')}#{account.get('tag_line', '')}"
+            f" | {self._format_account_tier_text(account)}"
+        )
 
     def _create_ui(self):
         layout = QVBoxLayout()
@@ -147,49 +189,79 @@ class MainWindow(QWidget):
         action_row.addWidget(self.apply_user_btn)
         action_row.addWidget(self.match_detail_btn)
 
-        info_row = QHBoxLayout()
         self.selected_account_label = QLabel("선택 계정: -")
         self.selected_match_label = QLabel("선택 경기: -")
-        info_row.addWidget(self.selected_account_label, 1)
-        info_row.addWidget(self.selected_match_label, 1)
+        self.selected_account_label.setWordWrap(True)
+        self.selected_match_label.setWordWrap(True)
+
+        info_layout = QVBoxLayout()
+        info_layout.addWidget(self.selected_account_label)
+        info_layout.addWidget(self.selected_match_label)
 
         self.recent_summary_label = QLabel(build_empty_recent_summary_text())
+        self.recent_summary_label.setWordWrap(True)
 
-        content_row = QHBoxLayout()
-
+        account_panel = QWidget()
         account_box = QVBoxLayout()
+        account_box.setContentsMargins(0, 0, 0, 0)
         account_box.addWidget(QLabel("검색된 계정"))
         self.account_list = QListWidget()
+        self.account_list.setMinimumWidth(220)
+        self.account_list.setMaximumWidth(280)
         account_box.addWidget(self.account_list)
+        account_panel.setLayout(account_box)
 
+        recent_panel = QWidget()
         center_box = QVBoxLayout()
+        center_box.setContentsMargins(0, 0, 0, 0)
         center_box.addWidget(QLabel("최근 경기"))
         self.match_table = self._create_table(MATCH_TABLE_COLUMNS)
+        self._configure_match_table()
         center_box.addWidget(self.match_table)
+        recent_panel.setLayout(center_box)
 
-        summary_box = QVBoxLayout()
-        summary_box.addWidget(QLabel("포지션 통계"))
+        position_panel = QWidget()
+        position_box = QVBoxLayout()
+        position_box.setContentsMargins(0, 0, 0, 0)
+        position_box.addWidget(QLabel("포지션 통계"))
         self.position_summary_table = self._create_table(POSITION_SUMMARY_COLUMNS)
-        summary_box.addWidget(self.position_summary_table)
-        summary_box.addWidget(QLabel("챔피언 통계"))
+        self._configure_summary_table(self.position_summary_table)
+        position_box.addWidget(self.position_summary_table)
+        position_panel.setLayout(position_box)
+
+        champion_panel = QWidget()
+        champion_box = QVBoxLayout()
+        champion_box.setContentsMargins(0, 0, 0, 0)
+        champion_box.addWidget(QLabel("챔피언 통계"))
         self.champion_summary_table = self._create_table(CHAMPION_SUMMARY_COLUMNS)
-        summary_box.addWidget(self.champion_summary_table)
+        self._configure_summary_table(self.champion_summary_table)
+        champion_box.addWidget(self.champion_summary_table)
+        champion_panel.setLayout(champion_box)
 
-        content_row.addLayout(account_box, 2)
-        content_row.addLayout(center_box, 5)
-        content_row.addLayout(summary_box, 3)
+        summary_splitter = QSplitter(Qt.Horizontal)
+        summary_splitter.addWidget(position_panel)
+        summary_splitter.addWidget(champion_panel)
+        summary_splitter.setChildrenCollapsible(False)
+        summary_splitter.setSizes([420, 420])
 
-        detail_box = QVBoxLayout()
-        detail_box.addWidget(QLabel("선택 경기 참가자"))
-        self.match_detail_table = self._create_table(MATCH_DETAIL_COLUMNS)
-        detail_box.addWidget(self.match_detail_table)
+        analysis_panel = QWidget()
+        analysis_layout = QVBoxLayout()
+        analysis_layout.setContentsMargins(0, 0, 0, 0)
+        analysis_layout.addWidget(recent_panel, 5)
+        analysis_layout.addWidget(summary_splitter, 3)
+        analysis_panel.setLayout(analysis_layout)
+
+        content_splitter = QSplitter(Qt.Horizontal)
+        content_splitter.addWidget(account_panel)
+        content_splitter.addWidget(analysis_panel)
+        content_splitter.setChildrenCollapsible(False)
+        content_splitter.setSizes([240, 1160])
 
         layout.addLayout(search_row)
         layout.addLayout(action_row)
-        layout.addLayout(info_row)
+        layout.addLayout(info_layout)
         layout.addWidget(self.recent_summary_label)
-        layout.addLayout(content_row, 4)
-        layout.addLayout(detail_box, 3)
+        layout.addWidget(content_splitter, 1)
 
         group.setLayout(layout)
         return group
@@ -202,7 +274,28 @@ class MainWindow(QWidget):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         table.setSelectionBehavior(QTableWidget.SelectRows)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setWordWrap(False)
         return table
+
+    def _configure_match_table(self):
+        header = self.match_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)
+        self.match_table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
+        self.match_table.setColumnWidth(1, 160)
+
+    def _configure_summary_table(self, table):
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        for index in range(1, table.columnCount()):
+            header.setSectionResizeMode(index, QHeaderView.ResizeToContents)
 
     def _connect_signals(self):
         self.dataset_list.itemClicked.connect(self.load_dataset)
@@ -213,6 +306,7 @@ class MainWindow(QWidget):
         self.user_table.toggle_clicked.connect(self.user_table.toggle_all)
         self.user_table.add_clicked.connect(self.user_table.add_row)
         self.user_table.delete_clicked.connect(self.user_table.delete_row)
+        self.user_table.couple_group_clicked.connect(self.open_couple_group_dialog)
         self.user_table.save_clicked.connect(self.save)
 
         self.team_result.generate_clicked.connect(self.make_team)
@@ -263,7 +357,6 @@ class MainWindow(QWidget):
         self.match_table.setRowCount(0)
         self.position_summary_table.setRowCount(0)
         self.champion_summary_table.setRowCount(0)
-        self.match_detail_table.setRowCount(0)
         self.selected_match = None
         self.recent_matches = []
         self.selected_match_label.setText("선택 경기: -")
@@ -391,6 +484,18 @@ class MainWindow(QWidget):
         team_app.save_dataset(self.current_file, users)
         QMessageBox.information(self, "저장 완료", "데이터가 저장되었습니다.")
 
+    def open_couple_group_dialog(self):
+        users = self.user_table.get_users_snapshot()
+        if not users:
+            QMessageBox.information(self, "커플 그룹", "먼저 유저를 표에 추가해주세요.")
+            return
+
+        self.couple_group_dialog.set_users(users)
+        if self.couple_group_dialog.exec_():
+            self.user_table.apply_couple_groups(
+                self.couple_group_dialog.get_group_map()
+            )
+
     def make_team(self):
         try:
             selected = team_app.extract_selected_users(self.user_table.table)
@@ -452,8 +557,9 @@ class MainWindow(QWidget):
 
         accounts = result.get("accounts", [])
         for account in accounts:
-            label = f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
+            label = self._format_account_list_label(account)
             item = QListWidgetItem(label)
+            item.setToolTip(label)
             item.setData(Qt.UserRole, account)
             self.account_list.addItem(item)
 
@@ -467,10 +573,9 @@ class MainWindow(QWidget):
     def select_account(self, item):
         self.selected_account = item.data(Qt.UserRole)
         self._clear_match_views()
-
-        game_name = self.selected_account.get("game_name", "")
-        tag_line = self.selected_account.get("tag_line", "")
-        self.selected_account_label.setText(f"선택 계정: {game_name}#{tag_line}")
+        self.selected_account_label.setText(
+            self._format_selected_account_label(self.selected_account)
+        )
         self._fetch_recent_matches(show_feedback=False)
 
     def open_account_from_team_result(self, user):
@@ -492,8 +597,9 @@ class MainWindow(QWidget):
 
         matched_item = None
         for account in result.get("accounts", []):
-            label = f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
+            label = self._format_account_list_label(account)
             item = QListWidgetItem(label)
+            item.setToolTip(label)
             item.setData(Qt.UserRole, account)
             self.account_list.addItem(item)
 
@@ -529,7 +635,6 @@ class MainWindow(QWidget):
         self._render_recent_matches(self.recent_matches)
         self._render_position_summary(summary["position_stats"])
         self._render_champion_summary(summary["champion_stats"])
-        self.match_detail_table.setRowCount(0)
         self.selected_match = None
         self.selected_match_label.setText("선택 경기: -")
 
@@ -568,21 +673,8 @@ class MainWindow(QWidget):
             return
 
         participants = team_app.normalize_match_detail(result)
-        self._fill_table(
-            self.match_detail_table,
-            participants,
-            [
-                "summoner_name",
-                "champion_name",
-                "position",
-                "result",
-                "kda",
-                "cs",
-                "damage",
-                "vision",
-            ],
-        )
-        self.match_detail_table.setHorizontalHeaderLabels(MATCH_DETAIL_COLUMNS)
+        self.match_detail_dialog.set_rows(participants)
+        self.match_detail_dialog.exec_()
 
     def apply_selected_user_to_table(self):
         try:
@@ -612,17 +704,22 @@ class MainWindow(QWidget):
                 QMessageBox.information(self, "중복 유저", "이미 표에 추가된 유저입니다.")
                 return
 
-            if self.recent_matches:
+            if user_profile.get("tier") == "언랭크":
+                message = (
+                    "선택한 유저가 언랭크 상태로 추가되었습니다.\n"
+                    "팀빌딩 전에 표에서 티어와 랭크를 직접 입력해주세요."
+                )
+            elif self.recent_matches:
                 message = (
                     "선택한 유저를 표에 추가했습니다.\n"
                     "최근 승률과 KDA, 포지션 통계가 함께 저장됩니다.\n"
-                    "티어는 직접 확인 후 조정해주세요."
+                    "불러온 티어 정보도 함께 반영됐는지 확인해주세요."
                 )
             else:
                 message = (
                     "선택한 유저를 표에 추가했습니다.\n"
-                    "최근 전적을 아직 불러오지 않아 수치가 기본값으로 들어갑니다.\n"
-                    "필요하면 전적을 불러온 뒤 다시 조정해주세요."
+                    "최근 전적은 아직 없지만, 저장된 티어 정보가 있으면 함께 반영됩니다.\n"
+                    "필요하면 전적 적재 후 다시 확인해주세요."
                 )
 
             QMessageBox.information(self, "추가 완료", message)

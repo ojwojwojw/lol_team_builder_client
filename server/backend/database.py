@@ -13,7 +13,7 @@ def get_connection() -> sqlite3.Connection:
 
 def init_db() -> None:
     """Create required tables if they do not exist yet."""
-    conn = get_connection()
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute(
@@ -22,6 +22,15 @@ def init_db() -> None:
             puuid TEXT PRIMARY KEY,
             game_name TEXT,
             tag_line TEXT,
+            summoner_id TEXT,
+            summoner_level INTEGER,
+            profile_icon_id INTEGER,
+            queue_type TEXT,
+            tier TEXT,
+            rank TEXT,
+            league_points INTEGER,
+            wins INTEGER,
+            losses INTEGER,
             fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
             raw_json TEXT
         )
@@ -146,5 +155,48 @@ def init_db() -> None:
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_user (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    _ensure_column(cursor, "riot_account", "summoner_id", "TEXT")
+    _ensure_column(cursor, "riot_account", "summoner_level", "INTEGER")
+    _ensure_column(cursor, "riot_account", "profile_icon_id", "INTEGER")
+    _ensure_column(cursor, "riot_account", "queue_type", "TEXT")
+    _ensure_column(cursor, "riot_account", "tier", "TEXT")
+    _ensure_column(cursor, "riot_account", "rank", "TEXT")
+    _ensure_column(cursor, "riot_account", "league_points", "INTEGER")
+    _ensure_column(cursor, "riot_account", "wins", "INTEGER")
+    _ensure_column(cursor, "riot_account", "losses", "INTEGER")
+    _ensure_column(cursor, "app_user", "is_admin", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(cursor, "app_user", "is_active", "INTEGER NOT NULL DEFAULT 1")
+    _ensure_column(cursor, "app_user", "created_at", "TEXT DEFAULT CURRENT_TIMESTAMP")
+
     conn.commit()
     conn.close()
+
+
+def _ensure_column(
+    cursor: sqlite3.Cursor,
+    table_name: str,
+    column_name: str,
+    column_type: str,
+) -> None:
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    if column_name in existing_columns:
+        return
+
+    cursor.execute(
+        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+    )
