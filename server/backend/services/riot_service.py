@@ -1,13 +1,11 @@
-from urllib.parse import quote
-
 from ..database import DB_PATH, get_connection, init_db
+from ..queries.match_read_query import MatchReadQuery
 from ..queries.match_write_query import MatchWriteQuery
 from ..queries.riot_api_query import (
     fetch_account,
     fetch_match_detail,
     fetch_match_ids,
     fetch_ranked_entries,
-    fetch_riot_json,
     fetch_summoner_by_puuid,
     select_preferred_ranked_entry,
 )
@@ -215,21 +213,39 @@ class RiotService:
                 return match_ids_result
 
             conn = get_connection()
+            match_read_query = MatchReadQuery(conn)
             match_write_query = MatchWriteQuery(conn)
             match_write_query.store_account(stored_account_payload)
 
+            requested_match_ids = [
+                (match_id or "").strip()
+                for match_id in match_ids_result["match_ids"]
+                if (match_id or "").strip()
+            ]
+            existing_match_ids = match_read_query.get_existing_match_ids(
+                requested_match_ids
+            )
+            pending_match_ids = [
+                match_id
+                for match_id in requested_match_ids
+                if match_id not in existing_match_ids
+            ]
+
             stored_match_ids = []
+            skipped_existing_match_ids = []
             failed_matches = []
-            for match_id in match_ids_result["match_ids"]:
-                url = (
-                    "https://asia.api.riotgames.com/lol/match/v5/matches/"
-                    f"{quote(match_id, safe='')}"
-                )
-                match_data, error = fetch_riot_json(url, api_key, "Failed to get match detail")
-                if error:
-                    failed_matches.append({"match_id": match_id, "error": error})
+
+            for match_id in requested_match_ids:
+                if match_id in existing_match_ids:
+                    skipped_existing_match_ids.append(match_id)
                     continue
 
+                match_result = fetch_match_detail(match_id, api_key)
+                if "error" in match_result:
+                    failed_matches.append({"match_id": match_id, "error": match_result})
+                    continue
+
+                match_data = match_result.get("raw_match") or {}
                 match_write_query.store_match_summary(match_data)
                 match_write_query.store_teams(
                     match_id, match_data.get("info", {}).get("teams", [])
@@ -252,6 +268,11 @@ class RiotService:
                 "league_points": stored_account_payload.get("league_points"),
                 "tier_sync_warning": stored_account_payload.get("tier_sync_warning"),
                 "requested_count": count,
+                "requested_match_ids": requested_match_ids,
+                "existing_match_ids": sorted(existing_match_ids),
+                "pending_match_ids": pending_match_ids,
+                "skipped_existing_match_ids": skipped_existing_match_ids,
+                "riot_detail_request_count": len(pending_match_ids),
                 "stored_match_ids": stored_match_ids,
                 "stored_count": len(stored_match_ids),
                 "failed_matches": failed_matches,

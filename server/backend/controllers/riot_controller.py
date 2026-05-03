@@ -8,11 +8,11 @@ from ..models.request_models import (
     StoreStoredAccountsRequest,
     StoreRecentMatchesRequest,
 )
-from ..security import get_current_user
+from ..security import require_admin_user
 from ..services.riot_service import RiotService
 
 
-router = APIRouter(dependencies=[Depends(get_current_user)])
+router = APIRouter(dependencies=[Depends(require_admin_user)])
 # Controller only handles HTTP input/output.
 # Business flow stays in the service layer.
 riot_service = RiotService()

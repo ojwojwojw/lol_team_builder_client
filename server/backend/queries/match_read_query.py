@@ -218,6 +218,29 @@ class MatchReadQuery:
         )
         return self._fetch_one_dict()
 
+    def get_existing_match_ids(self, match_ids: list[str]) -> set[str]:
+        """Return only the match ids that already exist in match_summary."""
+        normalized_match_ids = [
+            (match_id or "").strip()
+            for match_id in match_ids
+            if (match_id or "").strip()
+        ]
+        if not normalized_match_ids:
+            return set()
+
+        placeholders = ", ".join(["?" for _ in normalized_match_ids])
+        self.cursor.execute(
+            f"""
+            SELECT match_id
+            FROM match_summary
+            WHERE match_id IN ({placeholders})
+            """,
+            tuple(normalized_match_ids),
+        )
+        return {
+            row[0] for row in self.cursor.fetchall() if row and row[0]
+        }
+
     def get_match_teams(self, match_id: str) -> list[dict]:
         """Return stored team rows for one match."""
         self.cursor.execute(

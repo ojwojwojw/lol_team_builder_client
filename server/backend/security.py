@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import hmac
-import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 from .config import get_jwt_secret as get_env_jwt_secret
 from .queries.auth_query import get_user_by_id
@@ -51,29 +51,26 @@ def create_access_token(
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
     }
-    return _encode_jwt(payload)
+    return jwt.encode(
+        payload,
+        get_jwt_secret(),
+        algorithm=JWT_ALGORITHM,
+    )
 
 
 def decode_access_token(token: str) -> dict:
     try:
-        header_b64, payload_b64, signature_b64 = token.split(".")
-    except ValueError as exc:
-        raise _unauthorized("Invalid access token format.") from exc
+        payload = jwt.decode(
+            token,
+            get_jwt_secret(),
+            algorithms=[JWT_ALGORITHM],
+        )
+    except ExpiredSignatureError as exc:
+        raise _unauthorized("Token expired.") from exc
+    except InvalidTokenError as exc:
+        raise _unauthorized("Invalid access token.") from exc
 
-    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
-    expected_signature = _sign(signing_input)
-    actual_signature = _urlsafe_b64decode(signature_b64)
-
-    if not hmac.compare_digest(expected_signature, actual_signature):
-        raise _unauthorized("Token signature mismatch.")
-
-    payload = json.loads(_urlsafe_b64decode(payload_b64).decode("utf-8"))
-    exp = int(payload.get("exp", 0))
-    now_timestamp = int(datetime.now(timezone.utc).timestamp())
-    if exp <= now_timestamp:
-        raise _unauthorized("Token expired.")
-
-    return payload
+    return dict(payload)
 
 
 def get_current_user(
@@ -111,33 +108,6 @@ def get_jwt_secret() -> str:
     secret = secrets.token_urlsafe(48)
     JWT_SECRET_FILE.write_text(secret, encoding="utf-8")
     return secret
-
-
-def _encode_jwt(payload: dict) -> str:
-    header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
-    header_b64 = _urlsafe_b64encode(
-        json.dumps(header, separators=(",", ":")).encode("utf-8")
-    )
-    payload_b64 = _urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    )
-    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
-    signature_b64 = _urlsafe_b64encode(_sign(signing_input))
-    return f"{header_b64}.{payload_b64}.{signature_b64}"
-
-
-def _sign(message: bytes) -> bytes:
-    secret = get_jwt_secret().encode("utf-8")
-    return hmac.new(secret, message, hashlib.sha256).digest()
-
-
-def _urlsafe_b64encode(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("utf-8")
-
-
-def _urlsafe_b64decode(value: str) -> bytes:
-    padding = "=" * (-len(value) % 4)
-    return base64.urlsafe_b64decode(value + padding)
 
 
 def _unauthorized(detail: str) -> HTTPException:
