@@ -83,4 +83,4 @@ python client\main.py
 
 ## 배포 문서
 
-- Compute Engine + Docker: [deploy/gcp/DEPLOY_GCP_COMPUTE_ENGINE_DOCKER.md](deploy/gcp/DEPLOY_GCP_COMPUTE_ENGINE_DOCKER.md)
+- Cloud Run + Firestore + Docker: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md)

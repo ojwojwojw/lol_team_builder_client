@@ -10,7 +10,7 @@ KR_PLATFORM_BASE_URL = "https://kr.api.riotgames.com"
 
 
 def riot_error_response(response: requests.Response, default_msg: str) -> dict:
-    """Normalize Riot API errors into one consistent response shape."""
+    """Riot API 에러를 서버 전역에서 쓰는 공통 dict 형태로 맞춘다."""
     try:
         detail = response.json()
     except Exception:
@@ -23,6 +23,7 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
 
 
 def _resolve_api_key(api_key: str | None) -> str | None:
+    """요청 바디 키가 없으면 서버 환경변수의 Riot API 키를 대신 사용한다."""
     provided_key = (api_key or "").strip()
     if provided_key:
         return provided_key
@@ -30,7 +31,7 @@ def _resolve_api_key(api_key: str | None) -> str | None:
 
 
 def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
-    """Perform one Riot GET request with shared header and error handling."""
+    """공통 헤더와 예외 처리를 적용해 Riot GET 요청을 한 번 수행한다."""
     resolved_api_key = _resolve_api_key(api_key)
     if not resolved_api_key:
         return None, {
@@ -54,7 +55,7 @@ def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
 
 
 def fetch_account(game_name: str, tag_line: str, api_key: str | None) -> dict:
-    """Fetch Riot account info from Riot ID."""
+    """Riot ID로 계정 기본 정보와 PUUID를 조회한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/riot/account/v1/accounts/by-riot-id/"
         f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
@@ -71,7 +72,7 @@ def fetch_account(game_name: str, tag_line: str, api_key: str | None) -> dict:
 
 
 def fetch_summoner_by_puuid(puuid: str, api_key: str | None) -> dict:
-    """Fetch summoner payload needed for ranked lookup."""
+    """티어 조회에 필요한 소환사 정보 payload를 PUUID 기준으로 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/summoner/v4/summoners/by-puuid/"
         f"{quote(puuid, safe='')}"
@@ -92,7 +93,7 @@ def fetch_summoner_by_puuid(puuid: str, api_key: str | None) -> dict:
 
 
 def fetch_ranked_entries(puuid: str, api_key: str | None) -> dict:
-    """Fetch ranked queue entries for one encrypted puuid."""
+    """한 계정의 랭크 큐 엔트리 목록을 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/league/v4/entries/by-puuid/"
         f"{quote(puuid, safe='')}"
@@ -108,7 +109,7 @@ def fetch_ranked_entries(puuid: str, api_key: str | None) -> dict:
 
 
 def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
-    """Prefer solo queue over flex when multiple ranked entries exist."""
+    """솔로랭크를 우선하는 규칙으로 대표 랭크 엔트리 한 건을 고른다."""
     if not entries:
         return None
 
@@ -128,7 +129,7 @@ def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
 
 
 def fetch_match_ids(puuid: str, api_key: str | None, count: int = 5) -> dict:
-    """Fetch recent match ids for one puuid."""
+    """한 PUUID의 최근 경기 ID 목록을 가져온다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/by-puuid/"
         f"{quote(puuid, safe='')}/ids?start=0&count={count}"
@@ -140,7 +141,7 @@ def fetch_match_ids(puuid: str, api_key: str | None, count: int = 5) -> dict:
 
 
 def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
-    """Fetch one match detail and pre-build a small summary structure."""
+    """경기 상세 원본을 읽고 서비스가 바로 쓰기 쉬운 요약 구조로 정리한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/"
         f"{quote(match_id, safe='')}"
@@ -151,6 +152,7 @@ def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
 
     info = match_data.get("info", {})
     metadata = match_data.get("metadata", {})
+    # 로더/테스트 화면에서는 전체 원본보다 작은 요약 구조가 다루기 쉽다.
     participants = []
     for participant in info.get("participants", []):
         participants.append(

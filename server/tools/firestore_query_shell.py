@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from server.backend.firestore_store import get_client
+from server.backend.stores.firestore_client import get_client
 
 
 HELP_TEXT = """Commands:

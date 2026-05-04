@@ -1,151 +1,29 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from functools import lru_cache
-
 from google.cloud import firestore
 
-from .config import get_firestore_database, get_firestore_project
-
-
-def utcnow_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _normalize_username(username: str) -> str:
-    return (username or "").strip().lower()
-
-
-@lru_cache(maxsize=1)
-def get_client() -> firestore.Client:
-    client_kwargs: dict[str, str] = {}
-
-    project = get_firestore_project()
-    if project:
-        client_kwargs["project"] = project
-
-    database = get_firestore_database()
-    if database:
-        client_kwargs["database"] = database
-
-    return firestore.Client(**client_kwargs)
-
-
-def _account_collection():
-    return get_client().collection("riot_accounts")
+from .firestore_client import get_client, utcnow_iso
 
 
 def _match_collection():
+    """경기 원본/요약 문서를 저장하는 컬렉션을 반환한다."""
     return get_client().collection("matches")
 
 
 def _participant_index_collection():
+    """참가자 단위 조회를 빠르게 하기 위한 인덱스 컬렉션을 반환한다."""
     return get_client().collection("match_participants")
 
 
-def _user_collection():
-    return get_client().collection("app_users")
-
-
-def count_users() -> int:
-    return sum(1 for _ in _user_collection().stream())
-
-
-def get_user_by_username(username: str) -> dict | None:
-    doc_id = _normalize_username(username)
-    if not doc_id:
-        return None
-    snapshot = _user_collection().document(doc_id).get()
-    if not snapshot.exists:
-        return None
+def _with_id(snapshot: firestore.DocumentSnapshot) -> dict:
+    """Firestore 스냅샷에 문서 ID를 포함한 응답용 dict를 만든다."""
     data = snapshot.to_dict() or {}
     data["id"] = snapshot.id
     return data
-
-
-def get_user_by_id(user_id: str) -> dict | None:
-    doc_id = _normalize_username(user_id)
-    if not doc_id:
-        return None
-    snapshot = _user_collection().document(doc_id).get()
-    if not snapshot.exists:
-        return None
-    data = snapshot.to_dict() or {}
-    data["id"] = snapshot.id
-    return data
-
-
-def create_user(
-    username: str,
-    password_hash: str,
-    password_salt: str,
-    is_admin: bool = False,
-) -> dict:
-    doc_id = _normalize_username(username)
-    now = utcnow_iso()
-    payload = {
-        "username": username,
-        "password_hash": password_hash,
-        "password_salt": password_salt,
-        "is_admin": bool(is_admin),
-        "is_active": True,
-        "created_at": now,
-    }
-    _user_collection().document(doc_id).set(payload)
-    return get_user_by_id(doc_id) or {}
-
-
-def list_users() -> list[dict]:
-    users = []
-    for snapshot in _user_collection().stream():
-        data = snapshot.to_dict() or {}
-        data["id"] = snapshot.id
-        users.append(data)
-
-    users.sort(key=lambda user: (user.get("created_at", ""), user.get("id", "")))
-    return users
-
-
-def upsert_account(account: dict) -> None:
-    payload = dict(account)
-    payload["fetched_at"] = utcnow_iso()
-    _account_collection().document(payload["puuid"]).set(payload, merge=True)
-
-
-def list_accounts(limit: int) -> list[dict]:
-    docs = _account_collection().order_by("fetched_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
-    return [_with_id(snapshot) for snapshot in docs]
-
-
-def get_accounts_by_game_name(game_name: str) -> list[dict]:
-    docs = (
-        _account_collection()
-        .where("game_name", "==", game_name)
-        .order_by("fetched_at", direction=firestore.Query.DESCENDING)
-        .stream()
-    )
-    return [_with_id(snapshot) for snapshot in docs]
-
-
-def search_accounts_by_game_name(keyword: str, limit: int) -> list[dict]:
-    keyword_lower = (keyword or "").strip().lower()
-    if not keyword_lower:
-        return []
-
-    matches = []
-    for snapshot in _account_collection().stream():
-        data = snapshot.to_dict() or {}
-        game_name = str(data.get("game_name", "") or "")
-        if keyword_lower not in game_name.lower():
-            continue
-        data["id"] = snapshot.id
-        matches.append(data)
-
-    matches.sort(key=lambda account: account.get("fetched_at", ""), reverse=True)
-    return matches[:limit]
 
 
 def get_existing_match_ids(match_ids: list[str]) -> set[str]:
+    """적재 대상 match_id 중 Firestore에 이미 있는 것만 골라낸다."""
     normalized = [match_id.strip() for match_id in match_ids if (match_id or "").strip()]
     if not normalized:
         return set()
@@ -156,6 +34,7 @@ def get_existing_match_ids(match_ids: list[str]) -> set[str]:
 
 
 def store_match_bundle(match_id: str, match_data: dict) -> None:
+    """한 경기의 원본 데이터와 참가자 인덱스를 함께 Firestore에 저장한다."""
     info = match_data.get("info", {})
     metadata = match_data.get("metadata", {})
     teams = info.get("teams", [])
@@ -185,6 +64,7 @@ def store_match_bundle(match_id: str, match_data: dict) -> None:
     }
     _match_collection().document(match_id).set(match_payload)
 
+    # 참가자별 조회 속도를 위해 match_participants 컬렉션에도 요약 인덱스를 만든다.
     batch = get_client().batch()
     for participant in participants:
         participant_payload = _build_participant_index_payload(match_id, participant, match_payload)
@@ -194,6 +74,7 @@ def store_match_bundle(match_id: str, match_data: dict) -> None:
 
 
 def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
+    """한 사용자의 최근 경기 참가 이력을 PUUID 기준으로 가져온다."""
     docs = (
         _participant_index_collection()
         .where("puuid", "==", puuid)
@@ -205,6 +86,7 @@ def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
 
 
 def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> list[dict]:
+    """닉네임/태그 조합으로 최근 경기 참가 이력을 조회한다."""
     docs = (
         _participant_index_collection()
         .where("riot_id_game_name", "==", game_name)
@@ -217,6 +99,7 @@ def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> 
 
 
 def get_match_detail(match_id: str) -> dict | None:
+    """저장된 경기 한 건을 팀/참가자 상세까지 포함한 응답 형태로 재구성한다."""
     snapshot = _match_collection().document(match_id).get()
     if not snapshot.exists:
         return None
@@ -249,13 +132,8 @@ def get_match_detail(match_id: str) -> dict | None:
     }
 
 
-def _with_id(snapshot: firestore.DocumentSnapshot) -> dict:
-    data = snapshot.to_dict() or {}
-    data["id"] = snapshot.id
-    return data
-
-
 def _build_participant_index_payload(match_id: str, participant: dict, match_payload: dict) -> dict:
+    """참가자 최근 경기 목록 화면에 필요한 최소 필드만 따로 추려 저장한다."""
     challenges = participant.get("challenges", {})
     return {
         "match_id": match_id,
@@ -295,6 +173,7 @@ def _build_participant_index_payload(match_id: str, participant: dict, match_pay
 
 
 def _participant_detail_from_raw(participant: dict, match_id: str) -> dict:
+    """경기 상세 화면에 필요한 참가자 정보를 원본 match 문서에서 펼친다."""
     challenges = participant.get("challenges", {})
     return {
         "match_id": match_id,
@@ -336,6 +215,7 @@ def _participant_detail_from_raw(participant: dict, match_id: str) -> dict:
 
 
 def _team_detail(team: dict, match_id: str) -> dict:
+    """경기 상세 응답에 포함할 팀 단위 요약 정보를 만든다."""
     return {
         "match_id": match_id,
         "team_id": team.get("teamId"),

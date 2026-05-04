@@ -1,6 +1,8 @@
-from ..firestore_store import (
+from ..stores.match_store import (
     get_existing_match_ids,
     store_match_bundle,
+)
+from ..stores.riot_account_store import (
     upsert_account,
 )
 from ..queries.riot_api_query import (
@@ -14,10 +16,8 @@ from ..queries.riot_api_query import (
 
 
 class RiotService:
-    # Service assembles the business flow for one feature.
-    # It connects controller input to query calls and shapes the response.
-
     def get_puuid(self, game_name: str, tag_line: str, api_key: str) -> dict:
+        """Riot ID로 PUUID를 조회해 최소 식별 정보만 반환한다."""
         result = fetch_account(game_name, tag_line, api_key)
         if "error" in result:
             return result
@@ -28,9 +28,11 @@ class RiotService:
         }
 
     def get_match_ids(self, puuid: str, api_key: str, count: int) -> dict:
+        """한 PUUID의 최근 경기 ID 목록을 Riot API에서 그대로 받아 반환한다."""
         return fetch_match_ids(puuid, api_key, count)
 
     def get_match_detail(self, match_id: str, api_key: str) -> dict:
+        """한 경기의 상세를 Riot API에서 읽고 화면에 필요한 필드만 추려 반환한다."""
         result = fetch_match_detail(match_id, api_key)
         if "error" in result:
             return result
@@ -43,6 +45,7 @@ class RiotService:
         }
 
     def _build_stored_account_payload(self, account_result: dict, api_key: str) -> dict:
+        """Riot 계정, 소환사, 티어 정보를 Firestore 저장 형태로 조합한다."""
         puuid = account_result["puuid"]
         payload = {
             "puuid": puuid,
@@ -86,6 +89,7 @@ class RiotService:
         return payload
 
     def refresh_account_tier(self, game_name: str, tag_line: str, api_key: str) -> dict:
+        """한 Riot 계정의 티어 메타데이터만 다시 읽어 Firestore에 반영한다."""
         try:
             account_result = fetch_account(game_name, tag_line, api_key)
             if "error" in account_result:
@@ -121,6 +125,7 @@ class RiotService:
             }
 
     def refresh_account_tiers_for_accounts(self, accounts: list[dict], api_key: str) -> dict:
+        """선택된 여러 Riot 계정의 티어 메타데이터를 일괄 갱신한다."""
         normalized_accounts = []
         seen = set()
 
@@ -179,6 +184,7 @@ class RiotService:
     def store_recent_matches(
         self, game_name: str, tag_line: str, api_key: str, count: int = 5
     ) -> dict:
+        """한 Riot 계정의 최근 경기들을 읽어 Firestore에 저장한다."""
         try:
             account_result = fetch_account(game_name, tag_line, api_key)
             if "error" in account_result:
@@ -195,6 +201,7 @@ class RiotService:
             if "error" in match_ids_result:
                 return match_ids_result
 
+            # 최근 match_id 중 이미 저장된 경기는 건너뛰고, 새 경기만 적재한다.
             requested_match_ids = [
                 (match_id or "").strip()
                 for match_id in match_ids_result["match_ids"]
@@ -256,6 +263,7 @@ class RiotService:
     def store_recent_matches_for_accounts(
         self, accounts: list[dict], api_key: str, count: int = 5
     ) -> dict:
+        """선택된 여러 Riot 계정의 최근 경기들을 순차적으로 일괄 저장한다."""
         normalized_accounts = []
         seen = set()
 

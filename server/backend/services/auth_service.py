@@ -13,14 +13,13 @@ from ..security import create_access_token, hash_password, verify_password
 
 class AuthService:
     def get_setup_status(self) -> dict:
+        """최초 관리자 생성이 아직 필요한 상태인지 반환한다."""
         return {
             "needs_bootstrap": count_users() == 0,
         }
 
     def bootstrap_admin(self, username: str, password: str) -> dict:
-        # 최초 관리자 생성은 "DB 에 사용자가 하나도 없을 때"만 허용한다.
-        # 즉, 서버를 처음 띄운 딱 한 번만 공개 엔드포인트처럼 동작하고,
-        # 그 이후부터는 일반 로그인/관리자 계정 생성 흐름으로 넘어간다.
+        """사용자가 한 명도 없을 때 최초 관리자 계정을 한 번만 생성한다."""
         username = username.strip()
         self._validate_username_and_password(username, password)
 
@@ -40,10 +39,7 @@ class AuthService:
         }
 
     def login(self, username: str, password: str) -> dict:
-        # 로그인 흐름:
-        # 1) username 으로 app_user 조회
-        # 2) 비밀번호 해시 검증
-        # 3) 통과하면 JWT access token 발급
+        """아이디/비밀번호를 검증하고 JWT access token을 발급한다."""
         username = username.strip()
         user = get_user_by_username(username)
         if not user or not verify_password(
@@ -70,8 +66,7 @@ class AuthService:
         }
 
     def create_member(self, username: str, password: str) -> dict:
-        # 친구 계정 생성은 관리자 UI/엔드포인트에서만 호출된다.
-        # 현재 단계에서는 공개 회원가입 대신 "관리자 생성형 계정" 정책을 사용한다.
+        """관리자가 일반 사용자 계정을 추가할 때 사용하는 생성 함수다."""
         username = username.strip()
         self._validate_username_and_password(username, password)
 
@@ -90,17 +85,17 @@ class AuthService:
         }
 
     def list_members(self) -> dict:
-        # 개발자/관리자 화면에서 app_user 테이블 내용을 확인할 때 사용한다.
+        """관리자 화면에 보여줄 전체 사용자 목록을 직렬화해서 반환한다."""
         return {
             "users": [self._serialize_user(user) for user in list_users()]
         }
 
     def get_me(self, current_user: dict) -> dict:
+        """현재 로그인한 사용자의 공개 가능한 정보만 반환한다."""
         return self._serialize_user(current_user)
 
     def _serialize_user(self, user: dict) -> dict:
-        # 비밀번호 해시/솔트는 절대 클라이언트로 내리지 않는다.
-        # 화면/토큰에 필요한 최소 정보만 응답으로 직렬화한다.
+        """비밀번호 관련 민감정보를 제외한 사용자 응답 형태를 만든다."""
         return {
             "id": user["id"],
             "username": user["username"],
@@ -110,8 +105,7 @@ class AuthService:
         }
 
     def _validate_username_and_password(self, username: str, password: str) -> None:
-        # 지금은 최소형 구현이라 정책을 단순하게 둔다.
-        # 추후 필요하면 특수문자/길이/중복 정책을 이 함수에서 확장하면 된다.
+        """최소 길이 기준으로 아이디/비밀번호 형식을 검증한다."""
         if len(username) < 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -14,3 +14,5 @@ client/data/*.json
 !client/data/sample.json
 !client/data/README.md
 client/team_builder_client_error.log
+firebase-debug.log
+firestore-debug.log

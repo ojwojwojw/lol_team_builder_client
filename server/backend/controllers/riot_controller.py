@@ -13,14 +13,12 @@ from ..services.riot_service import RiotService
 
 
 router = APIRouter(dependencies=[Depends(require_admin_user)])
-# Controller only handles HTTP input/output.
-# Business flow stays in the service layer.
 riot_service = RiotService()
 
 
 @router.post("/get_puuid")
 def get_puuid(req: RiotAccountRequest = Body(...)):
-    """Normalize Riot ID input and delegate puuid lookup to the service."""
+    """입력된 Riot ID를 정규화한 뒤 PUUID 조회 서비스로 넘긴다."""
     game_name = req.game_name.strip().rstrip("#")
     tag_line = req.tag_line.strip().lstrip("#")
     return riot_service.get_puuid(game_name, tag_line, req.api_key)
@@ -28,19 +26,19 @@ def get_puuid(req: RiotAccountRequest = Body(...)):
 
 @router.post("/get_match_ids")
 def get_match_ids(req: MatchIdsRequest = Body(...)):
-    """Receive a puuid and return recent match ids."""
+    """PUUID를 받아 최근 경기 ID 목록 조회를 서비스에 위임한다."""
     return riot_service.get_match_ids(req.puuid.strip(), req.api_key, req.count)
 
 
 @router.post("/get_match_detail")
 def get_match_detail(req: MatchDetailRequest = Body(...)):
-    """Receive a match id and return summarized match detail."""
+    """match_id를 받아 경기 상세 조회를 서비스에 위임한다."""
     return riot_service.get_match_detail(req.match_id.strip(), req.api_key)
 
 
 @router.post("/store_recent_matches")
 def store_recent_matches(req: StoreRecentMatchesRequest = Body(...)):
-    """Receive Riot ID info and trigger fetch + DB save for recent matches."""
+    """한 Riot 계정의 최근 경기 수집과 Firestore 저장을 요청한다."""
     game_name = req.game_name.strip().rstrip("#")
     tag_line = req.tag_line.strip().lstrip("#")
     return riot_service.store_recent_matches(game_name, tag_line, req.api_key, req.count)
@@ -48,7 +46,7 @@ def store_recent_matches(req: StoreRecentMatchesRequest = Body(...)):
 
 @router.post("/refresh_account_tier")
 def refresh_account_tier(req: RiotAccountRequest = Body(...)):
-    """Refresh and store only tier-related account metadata for one Riot ID."""
+    """한 Riot 계정의 티어 메타데이터만 다시 읽어 저장한다."""
     game_name = req.game_name.strip().rstrip("#")
     tag_line = req.tag_line.strip().lstrip("#")
     return riot_service.refresh_account_tier(game_name, tag_line, req.api_key)
@@ -56,7 +54,7 @@ def refresh_account_tier(req: RiotAccountRequest = Body(...)):
 
 @router.post("/refresh_account_tier/by-stored-accounts")
 def refresh_account_tier_by_stored_accounts(req: RefreshStoredAccountsRequest = Body(...)):
-    """Refresh and store only tier metadata for selected riot_account rows."""
+    """선택된 저장 계정들의 티어 메타데이터를 일괄 갱신한다."""
     accounts = [
         {
             "game_name": account.game_name.strip().rstrip("#"),
@@ -69,7 +67,7 @@ def refresh_account_tier_by_stored_accounts(req: RefreshStoredAccountsRequest = 
 
 @router.post("/store_recent_matches/by-stored-accounts")
 def store_recent_matches_by_stored_accounts(req: StoreStoredAccountsRequest = Body(...)):
-    """Store recent matches for selected accounts that already exist in riot_account."""
+    """선택된 저장 계정들의 최근 경기를 일괄 수집해 Firestore에 저장한다."""
     accounts = [
         {
             "game_name": account.game_name.strip().rstrip("#"),

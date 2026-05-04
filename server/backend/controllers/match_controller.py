@@ -10,13 +10,13 @@ match_service = MatchService()
 
 @router.get("/accounts")
 def list_accounts(limit: int = Query(100, ge=1, le=1000)):
-    """Return stored riot_account rows ordered by latest fetch time."""
+    """저장된 Riot 계정 목록을 최신 동기화 순으로 반환한다."""
     return match_service.list_accounts(limit)
 
 
 @router.get("/accounts/by-game-name")
 def get_accounts_by_game_name(game_name: str = Query(..., min_length=1)):
-    """Return stored riot_account rows for one game name."""
+    """같은 게임 닉네임을 가진 저장 계정 목록을 반환한다."""
     return match_service.get_accounts_by_game_name(game_name.strip())
 
 
@@ -25,7 +25,7 @@ def search_accounts_by_game_name(
     keyword: str = Query(..., min_length=1),
     limit: int = Query(1000, ge=1, le=1000),
 ):
-    """Return stored riot_account rows using a game_name LIKE search."""
+    """게임 닉네임 부분 검색으로 저장 계정 목록을 반환한다."""
     return match_service.search_accounts_by_game_name(keyword.strip(), limit)
 
 
@@ -34,7 +34,7 @@ def get_recent_matches_by_puuid(
     puuid: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=100),
 ):
-    """Return recent stored matches for one puuid."""
+    """한 PUUID의 최근 저장 경기 목록을 반환한다."""
     return match_service.get_recent_matches_by_puuid(puuid.strip(), limit)
 
 
@@ -44,7 +44,7 @@ def get_recent_matches_by_riot_id(
     tag_line: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=100),
 ):
-    """Return recent stored matches for one Riot ID."""
+    """한 Riot ID의 최근 저장 경기 목록을 반환한다."""
     return match_service.get_recent_matches_by_riot_id(
         game_name.strip().rstrip("#"),
         tag_line.strip().lstrip("#"),
@@ -54,5 +54,5 @@ def get_recent_matches_by_riot_id(
 
 @router.get("/matches/{match_id}")
 def get_match_detail(match_id: str):
-    """Return one stored match with summary, teams, and participants."""
+    """저장된 경기 한 건의 요약/팀/참가자 상세를 반환한다."""
     return match_service.get_match_detail(match_id.strip())
