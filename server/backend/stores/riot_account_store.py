@@ -63,3 +63,17 @@ def search_accounts_by_game_name(keyword: str, limit: int) -> list[dict]:
 
     matches.sort(key=lambda account: account.get("fetched_at", ""), reverse=True)
     return matches[:limit]
+
+
+def get_account_by_riot_id(game_name: str, tag_line: str) -> dict | None:
+    """정확한 Riot ID와 일치하는 저장 계정 한 건을 찾는다."""
+    docs = (
+        _account_collection()
+        .where("game_name", "==", game_name)
+        .where("tag_line", "==", tag_line)
+        .limit(1)
+        .stream()
+    )
+    for snapshot in docs:
+        return _with_id(snapshot)
+    return None

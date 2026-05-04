@@ -4,6 +4,7 @@ from ..stores.match_store import (
     get_recent_matches_by_riot_id as load_recent_matches_by_riot_id,
 )
 from ..stores.riot_account_store import (
+    get_account_by_riot_id as load_account_by_riot_id,
     get_accounts_by_game_name as load_accounts_by_game_name,
     list_accounts as load_accounts,
     search_accounts_by_game_name as search_accounts,
@@ -51,6 +52,11 @@ class MatchService:
     ) -> dict:
         """닉네임과 태그 조합으로 최근 경기 참가 이력을 반환한다."""
         matches = load_recent_matches_by_riot_id(game_name, tag_line, limit)
+        if not matches:
+            account = load_account_by_riot_id(game_name, tag_line)
+            puuid = (account or {}).get("puuid")
+            if puuid:
+                matches = load_recent_matches_by_puuid(puuid, limit)
         return {
             "game_name": game_name,
             "tag_line": tag_line,

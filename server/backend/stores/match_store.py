@@ -75,14 +75,13 @@ def store_match_bundle(match_id: str, match_data: dict) -> None:
 
 def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
     """한 사용자의 최근 경기 참가 이력을 PUUID 기준으로 가져온다."""
-    docs = (
-        _participant_index_collection()
-        .where("puuid", "==", puuid)
-        .order_by("game_start_timestamp", direction=firestore.Query.DESCENDING)
-        .limit(limit)
-        .stream()
+    docs = _participant_index_collection().where("puuid", "==", puuid).stream()
+    matches = [_with_id(snapshot) for snapshot in docs]
+    matches.sort(
+        key=lambda match: int(match.get("game_start_timestamp") or 0),
+        reverse=True,
     )
-    return [_with_id(snapshot) for snapshot in docs]
+    return matches[:limit]
 
 
 def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> list[dict]:
@@ -91,11 +90,14 @@ def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> 
         _participant_index_collection()
         .where("riot_id_game_name", "==", game_name)
         .where("riot_id_tagline", "==", tag_line)
-        .order_by("game_start_timestamp", direction=firestore.Query.DESCENDING)
-        .limit(limit)
         .stream()
     )
-    return [_with_id(snapshot) for snapshot in docs]
+    matches = [_with_id(snapshot) for snapshot in docs]
+    matches.sort(
+        key=lambda match: int(match.get("game_start_timestamp") or 0),
+        reverse=True,
+    )
+    return matches[:limit]
 
 
 def get_match_detail(match_id: str) -> dict | None:
