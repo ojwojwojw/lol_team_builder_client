@@ -14,6 +14,7 @@ from application.team_app import team_app
 
 class LoginDialog(QDialog):
     DEFAULT_BOOTSTRAP_USERNAME = "admin"
+    USERNAME_PLACEHOLDER = "아이디를 입력해주세요"
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -44,7 +45,7 @@ class LoginDialog(QDialog):
 
         self.username_input = QLineEdit()
         self.username_input.setText(team_app.load_auth_username())
-        self.username_input.setPlaceholderText(self.DEFAULT_BOOTSTRAP_USERNAME)
+        self.username_input.setPlaceholderText(self.USERNAME_PLACEHOLDER)
 
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.Password)
@@ -86,8 +87,6 @@ class LoginDialog(QDialog):
 
         self.bootstrap_btn.setVisible(self.needs_bootstrap)
         if self.needs_bootstrap:
-            if not self.username_input.text().strip():
-                self.username_input.setText(self.DEFAULT_BOOTSTRAP_USERNAME)
             self.guide_label.setText(
                 "현재 서버에는 계정이 없어 최초 관리자 계정을 먼저 만들어야 합니다.\n"
                 "아이디를 비워두면 기본값 admin을 사용합니다."

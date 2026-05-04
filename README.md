@@ -1,5 +1,7 @@
 # LOL Team Builder
 
+👉 [최신 빌드 버전 다운로드](https://github.com/ojwojwojw/lol_team_builder/releases/latest)
+
 로컬 팀 생성 알고리즘을 중심으로 두고, Riot 전적 데이터는 `보정`과 `운영 데이터 축적`에 사용하는 데스크톱 + API 프로젝트입니다.
 
 핵심은 [client/domain/team_builder.py](client/domain/team_builder.py) 의 팀 생성 로직입니다.  
