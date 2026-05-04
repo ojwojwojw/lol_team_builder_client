@@ -38,9 +38,10 @@
   - `firebase.json`
   - `firestore.rules`
 - 로컬 테스트 절차를 `local_test_guild.md` 문서로 정리했습니다.
-- Firestore 내용을 확인할 수 있도록 다음 도구를 유지했습니다.
-  - `server/tools/firestore_query_shell.py`
-  - `server/tools/firestore_viewer.py`
+- Firestore 내용을 확인하는 방식도 정리했습니다.
+  - 기존 `server/tools/firestore_query_shell.py`, `server/tools/firestore_viewer.py` 는 제거했습니다.
+  - 중간 단계로 `server/tools/firestore_monitor.py` 를 추가했습니다.
+  - 이후 실제 운영/테스트 편의성을 위해 Firestore 모니터링 기능을 `riot_loader` 팝업으로 통합했습니다.
 
 ### 4. 관리자 최초 생성 UX 개선
 
@@ -68,9 +69,52 @@
   - `server/backend/controllers/*`
   - `server/backend/queries/riot_api_query.py`
 
+### 7. Firestore 관리 팝업 및 관리자 API 추가
+
+- `riot_loader` 안에서 Firestore 상태를 보고 관리할 수 있도록 전용 팝업을 추가했습니다.
+  - `client/ui/firestore_admin_dialog.py`
+- 팝업에서 다음 작업을 수행할 수 있습니다.
+  - 컬렉션별 문서 수와 대략적인 JSON 크기 확인
+  - 문서 목록/상세 JSON 확인
+  - 선택 문서 삭제
+  - 현재 컬렉션 전체 삭제
+  - 기준 일수보다 오래된 경기 데이터 삭제
+- 이를 위해 서버에 관리자 전용 Firestore 관리 API를 추가했습니다.
+  - `server/backend/controllers/firestore_admin_controller.py`
+  - `server/backend/stores/firestore_admin_store.py`
+  - `server/backend/models/request_models.py`
+  - `server/backend/app.py`
+- `matches` 삭제 시 관련 `match_participants` 인덱스도 함께 정리되도록 삭제 연쇄 처리도 보강했습니다.
+
+### 8. 삭제 안전장치 및 Firestore 팝업 UX 개선
+
+- Firestore 관리 팝업의 삭제 기능에 입력형 확인 절차를 추가했습니다.
+  - 선택 문서 삭제: `진짜 선택문서 삭제를 수행합니다`
+  - 현재 컬렉션 전체 삭제: `진짜 현재 컬렉션 삭제를 수행합니다`
+  - 기간 기준 삭제: `진짜 기간기준 문서 삭제를 수행합니다`
+- 삭제 결과가 길어질 때 팝업 높이가 과하게 커지고 다시 줄어들지 않던 문제를 수정했습니다.
+  - 상태 문구와 상세 응답 로그를 분리했습니다.
+  - 상세 로그는 고정 높이 스크롤 박스로 표시되도록 바꿨습니다.
+
+### 9. Riot Loader 세션 단순화 및 메인 화면 계정 검색 UX 개선
+
+- `riot_loader` 상단에 `Firestore 관리` 버튼과 `로그아웃` 버튼을 추가했습니다.
+- 기존 `관리자 다시 로그인` 버튼은 제거해 세션 UI를 단순화했습니다.
+- 로그아웃 시에는 토큰뿐 아니라 열려 있던 보조 팝업, 세션 상태, API 키 입력값도 함께 정리되도록 했습니다.
+- 메인 클라이언트의 최근 전적 분석 영역에는 `전체 유저 검색` 버튼을 추가했습니다.
+  - 검색어 입력이 비어 있을 때 검증을 우회하는 방식 대신,
+  - `/accounts` 전체 조회 API를 명시적으로 호출하는 구조로 정리했습니다.
+  - 관련 파일:
+    - `client/ui/main_window.py`
+    - `client/api_clients/match_api_client.py`
+    - `client/application/account_queries.py`
+    - `client/application/team_app.py`
+
 ## 영향
 
 - 서버 구조가 Firestore 기준으로 더 명확해져 이후 유지보수와 확장이 쉬워졌습니다.
 - 로컬 테스트 환경에서 Firestore Emulator를 기준으로 서버/클라이언트/적재/조회 흐름을 재현하기 쉬워졌습니다.
 - SQLite와 Compute Engine 잔존 흔적이 정리되어 현재 프로젝트 방향이 더 선명해졌습니다.
 - 함수 단위 설명이 추가되어 코드 온보딩 속도와 읽기 편의성이 좋아졌습니다.
+- 운영자 입장에서는 `riot_loader` 하나만으로 적재, 모니터링, 선택 삭제, 기간 정리까지 수행할 수 있게 되어 관리 동선이 크게 단순해졌습니다.
+- 메인 클라이언트에서는 계정 검색과 전체 계정 조회의 의미가 분리되어 사용 흐름이 더 직관적으로 바뀌었습니다.

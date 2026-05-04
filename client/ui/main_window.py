@@ -192,11 +192,13 @@ class MainWindow(QWidget):
         self.recent_match_limit.setRange(1, 100)
         self.recent_match_limit.setValue(10)
         self.account_search_btn = QPushButton("계정 검색")
+        self.account_list_all_btn = QPushButton("전체 유저 검색")
         self.apply_user_btn = QPushButton("선택 유저 추가")
         self.match_detail_btn = QPushButton("경기 상세 보기")
         action_row.addWidget(QLabel("최근 경기 수"))
         action_row.addWidget(self.recent_match_limit)
         action_row.addWidget(self.account_search_btn)
+        action_row.addWidget(self.account_list_all_btn)
         action_row.addWidget(self.apply_user_btn)
         action_row.addWidget(self.match_detail_btn)
 
@@ -328,6 +330,7 @@ class MainWindow(QWidget):
         self.logout_btn.clicked.connect(self.logout)
         self.config_btn.clicked.connect(self.open_config_dialog)
         self.account_search_btn.clicked.connect(self.search_accounts)
+        self.account_list_all_btn.clicked.connect(self.load_all_accounts)
         self.account_keyword_input.returnPressed.connect(self.search_accounts)
         self.apply_user_btn.clicked.connect(self.apply_selected_user_to_table)
         self.match_detail_btn.clicked.connect(self.load_match_detail)
@@ -608,6 +611,20 @@ class MainWindow(QWidget):
             QMessageBox.critical(self, "API 오류", str(exc))
             return
 
+        self._render_account_results(result, empty_message="검색된 계정이 없습니다.")
+
+    def load_all_accounts(self):
+        """검색어 없이 저장된 전체 유저 목록을 불러온다."""
+        try:
+            result = team_app.list_accounts(ACCOUNT_SEARCH_LIMIT)
+        except Exception as exc:
+            QMessageBox.critical(self, "API 오류", str(exc))
+            return
+
+        self._render_account_results(result, empty_message="저장된 계정이 없습니다.")
+
+    def _render_account_results(self, result, empty_message: str):
+        """검색/전체조회 응답을 공통 방식으로 리스트에 그린다."""
         self.account_list.clear()
         self.selected_account = None
         self.selected_account_label.setText("선택 계정: -")
@@ -622,7 +639,7 @@ class MainWindow(QWidget):
             self.account_list.addItem(item)
 
         if not accounts:
-            QMessageBox.information(self, "검색 결과", "검색된 계정이 없습니다.")
+            QMessageBox.information(self, "검색 결과", empty_message)
             return
 
         self.account_list.setCurrentRow(0)

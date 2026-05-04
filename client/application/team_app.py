@@ -5,6 +5,7 @@ from application.account_queries import (
     get_current_user,
     get_match_detail,
     get_recent_matches_by_riot_id,
+    list_accounts,
     list_users,
     login,
     search_accounts,
@@ -95,6 +96,7 @@ class TeamApp:
         save_theme_mode(theme_mode)
 
     search_accounts = staticmethod(search_accounts)
+    list_accounts = staticmethod(list_accounts)
     login = staticmethod(login)
     bootstrap_admin = staticmethod(bootstrap_admin)
     get_auth_setup_status = staticmethod(get_auth_setup_status)

@@ -6,6 +6,12 @@ from api_clients.base_api_client import BaseApiClient
 class MatchApiClient(BaseApiClient):
     """Match/account read API client."""
 
+    def list_accounts(self, limit=20):
+        return self._get(
+            "/accounts",
+            {"limit": limit},
+        )
+
     def search_accounts(self, keyword, limit=20):
         return self._get(
             "/accounts/search",

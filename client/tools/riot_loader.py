@@ -27,6 +27,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from application.team_app import team_app
 from tools.riot_loader_api import RiotLoaderApi
+from ui.firestore_admin_dialog import FirestoreAdminDialog
 from ui.login_dialog import LoginDialog
 from ui.riot_loader_scheduler_dialog import RiotLoaderSchedulerDialog
 from ui.style_loader import load_style
@@ -40,6 +41,7 @@ class RiotLoaderWidget(QWidget):
         self.current_match_ids = []
         self.api = RiotLoaderApi()
         self.scheduler_dialog = None
+        self.firestore_admin_dialog = None
 
         self.setWindowTitle("Riot 적재 도구")
         self.setMinimumSize(980, 760)
@@ -91,11 +93,14 @@ class RiotLoaderWidget(QWidget):
         button_row = QHBoxLayout()
         self.scheduler_btn = QPushButton("배치 스케줄러 열기")
         self.scheduler_btn.clicked.connect(self.open_scheduler_dialog)
-        self.relogin_btn = QPushButton("관리자 다시 로그인")
-        self.relogin_btn.clicked.connect(self.reauthenticate)
+        self.firestore_btn = QPushButton("Firestore 관리")
+        self.firestore_btn.clicked.connect(self.open_firestore_dialog)
+        self.logout_btn = QPushButton("로그아웃")
+        self.logout_btn.clicked.connect(self.logout)
         button_row.addWidget(self.scheduler_btn)
+        button_row.addWidget(self.firestore_btn)
         button_row.addStretch(1)
-        button_row.addWidget(self.relogin_btn)
+        button_row.addWidget(self.logout_btn)
 
         layout.addWidget(title)
         layout.addWidget(subtitle)
@@ -454,14 +459,50 @@ class RiotLoaderWidget(QWidget):
         self.scheduler_dialog.raise_()
         self.scheduler_dialog.activateWindow()
 
-    def reauthenticate(self):
-        current_user = ensure_admin_session(self)
-        if current_user:
-            self.current_user = current_user
-            self._update_server_label()
-            self._update_session_badge()
-            self.status_label.setText("관리자 세션을 새로고침했습니다.")
+    def open_firestore_dialog(self):
+        if self.firestore_admin_dialog is None:
+            self.firestore_admin_dialog = FirestoreAdminDialog(self)
+        self.firestore_admin_dialog.show()
+        self.firestore_admin_dialog.raise_()
+        self.firestore_admin_dialog.activateWindow()
 
+    def _close_aux_dialogs(self):
+        """로그아웃이나 세션 전환 전에 보조 팝업을 닫아 이전 세션 상태가 남지 않게 한다."""
+        if self.scheduler_dialog is not None:
+            self.scheduler_dialog.close()
+            self.scheduler_dialog = None
+        if self.firestore_admin_dialog is not None:
+            self.firestore_admin_dialog.close()
+            self.firestore_admin_dialog = None
+
+    def logout(self):
+        """현재 관리자 세션을 종료하고 다시 로그인할지 선택하게 한다."""
+        answer = QMessageBox.question(
+            self,
+            "로그아웃 확인",
+            "현재 관리자 세션을 종료하고 다시 로그인하시겠습니까?",
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        self._close_aux_dialogs()
+        team_app.clear_auth_token()
+        self.current_user = {}
+        self.current_puuid = ""
+        self.current_match_ids = []
+        self.api_key_input.clear()
+        self._update_session_badge()
+        self._set_message("관리자 세션에서 로그아웃했습니다.")
+
+        current_user = ensure_admin_session(self)
+        if not current_user:
+            self.close()
+            return
+
+        self.current_user = current_user
+        self._update_server_label()
+        self._update_session_badge()
+        self._set_message("새 관리자 세션으로 다시 로그인했습니다.")
 
 def ensure_admin_session(parent=None):
     existing_token = team_app.load_auth_token().strip()

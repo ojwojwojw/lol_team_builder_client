@@ -7,6 +7,11 @@ def search_accounts(keyword, limit=20):
     return client.search_accounts(keyword, limit)
 
 
+def list_accounts(limit=20):
+    client = MatchApiClient()
+    return client.list_accounts(limit)
+
+
 def get_recent_matches_by_riot_id(game_name, tag_line, limit=10):
     client = MatchApiClient()
     return client.get_recent_matches_by_riot_id(game_name, tag_line, limit)

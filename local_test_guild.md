@@ -150,29 +150,7 @@ http://127.0.0.1:4000
 - `matches`
 - `match_participants`
 
-### 터미널 쿼리 셸
-
-PowerShell 창 5:
-
-```powershell
-cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
-.\.venv\Scripts\activate
-$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
-$env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
-python server\tools\firestore_query_shell.py
-```
-
-예시 명령:
-
-```text
-collections
-show app_users
-show riot_accounts 20
-show matches 5
-get app_users admin
-```
-
-### 간단 뷰어 GUI
+### Firestore 모니터 GUI
 
 PowerShell 창 6:
 
@@ -181,8 +159,15 @@ cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
 .\.venv\Scripts\activate
 $env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
 $env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
-python server\tools\firestore_viewer.py
+python server\tools\firestore_monitor.py
 ```
+
+이 도구에서 볼 수 있는 것:
+
+- 컬렉션별 문서 수
+- 컬렉션별 대략적인 JSON 크기
+- 문서 ID 목록
+- 선택 문서의 JSON 상세
 
 ## 7. 종료 후 데이터 유지
 
