@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import google.auth
 from .firestore_client import get_client, utcnow_iso
 
 
@@ -15,6 +15,8 @@ def _user_collection():
 
 def count_users() -> int:
     """현재 저장된 앱 사용자 수를 센다."""
+    creds, project = google.auth.default()
+    print("🔥 RUNNING AS:", getattr(creds, "service_account_email", "NO EMAIL"))
     try:
         count = sum(1 for _ in _user_collection().stream())
         print("APP_USERS COUNT:", count)
