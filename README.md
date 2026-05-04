@@ -1,86 +1,116 @@
 # LOL Team Builder
 
-리그 오브 레전드 내전 밸런싱을 돕는 데스크톱 클라이언트와 FastAPI 서버 프로젝트입니다.
+로컬 팀 생성 알고리즘을 중심으로 두고, Riot 전적 데이터는 `보정`과 `운영 데이터 축적`에 사용하는 데스크톱 + API 프로젝트입니다.
 
-현재 서버 저장소는 `SQLite`가 아니라 `Firestore`를 사용합니다. 최근 경기 데이터와 Riot 계정 메타데이터, 앱 사용자 계정은 Firestore에 저장됩니다.
+핵심은 [client/domain/team_builder.py](client/domain/team_builder.py) 의 팀 생성 로직입니다.  
+클라우드 쪽은 이 핵심을 대체하는 것이 아니라, `저장된 Riot 계정`, `최근 경기 데이터`, `관리 도구`를 제공하는 보조 계층입니다.
 
-## 프로젝트 구조
+![Architecture Overview](docs/images/architecture-overview.svg)
 
-- `client/`
-  - 데스크톱 클라이언트 코드
-- `client/domain/`
-  - 팀 생성 알고리즘과 밸런스 계산 로직
-- `client/tools/`
-  - Riot 데이터 적재용 보조 도구
-- `server/`
+## 컨셉
+
+- 팀 생성 알고리즘은 로컬에서 바로 실행됩니다.
+- 메인 클라이언트는 Firestore에 저장된 Riot 계정과 최근 경기 데이터를 읽어 팀 빌딩에 참고합니다.
+- `riot_loader`는 관리자 전용 운영 도구입니다.
+  - Riot API 키를 로컬에서 직접 넣고
+  - 친구들의 최근 경기 데이터를 수동/배치로 적재하고
+  - Firestore 상태를 모니터링하고 정리합니다.
+- 서버는 `Cloud Run + FastAPI + Firestore` 구조를 기준으로 동작합니다.
+
+## 현재 아키텍처
+
+- 메인 앱: `PyQt5` 데스크톱 클라이언트
+- 핵심 도메인: 로컬 팀 생성 알고리즘
+- 운영 도구: `riot_loader`
+- 백엔드: `FastAPI`
+- 저장소: `Cloud Firestore`
+- 배포 대상: `GCP Cloud Run`
+
+### Firestore 컬렉션
+
+- `app_users`
+  - 관리자/앱 사용자 계정
+- `riot_accounts`
+  - 저장된 Riot 계정 메타데이터
+- `matches`
+  - 경기 상세 원본 + 요약
+- `match_participants`
+  - 최근 경기 조회를 빠르게 하기 위한 참가자 인덱스
+
+## 저장소 구조
+
+- [client/](client)
+  - 메인 데스크톱 앱
+- [client/domain/](client/domain)
+  - 핵심 팀 생성 알고리즘
+- [client/tools/](client/tools)
+  - `riot_loader` 등 운영 도구
+- [server/](server)
   - FastAPI 서버
-- `deploy/gcp/`
-  - GCP 배포 관련 문서와 설정
+- [deploy/gcp/](deploy/gcp)
+  - GCP 배포 문서
+- [patch_notes/](patch_notes)
+  - 날짜별 패치노트
 
-## 현재 서버 아키텍처
+## 문서 모음
 
-- 앱 사용자 계정 저장: `app_users`
-- Riot 계정 메타데이터 저장: `riot_accounts`
-- 경기 요약/원본 저장: `matches`
-- 참가자 인덱스 저장: `match_participants`
+- 배포 가이드: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md)
+- 로컬 테스트 가이드: [local_test_guild.md](local_test_guild.md)
+- 최신 패치노트: [patch_notes/PATCH_NOTES_2026-05-05.md](patch_notes/PATCH_NOTES_2026-05-05.md)
+- 전체 패치노트 폴더: [patch_notes/](patch_notes)
 
-Riot API 키는 요청 바디로 넘길 수도 있고, 서버 환경변수 `TEAM_BUILDER_RIOT_API_KEY`에 넣어 숨길 수도 있습니다.
-
-## 로컬 실행
+## 빠른 시작
 
 ### 1. 가상환경 활성화
 
 ```powershell
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
-.\.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
+```
+
+PowerShell 실행 정책 때문에 막히면:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 ### 2. 서버 의존성 설치
 
 ```powershell
-pip install -r server\requirements.txt
+python -m pip install -r server\requirements.txt
 ```
 
-### 3. Firestore 접속 환경변수 설정
-
-실서비스 Firestore를 쓸 때:
-
-```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
-$env:TEAM_BUILDER_FIRESTORE_PROJECT="your-gcp-project-id"
-$env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
-$env:TEAM_BUILDER_JWT_SECRET="replace-with-a-long-random-secret"
-$env:TEAM_BUILDER_RIOT_API_KEY="your-riot-api-key"
-```
-
-로컬 테스트에서 Firestore Emulator를 쓸 때:
+### 3. Firestore Emulator 기준 서버 실행
 
 ```powershell
 $env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
-$env:TEAM_BUILDER_FIRESTORE_PROJECT="team-builder-local"
+$env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
 $env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
 $env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
-$env:TEAM_BUILDER_RIOT_API_KEY="your-riot-api-key"
-```
-
-### 4. 서버 실행
-
-```powershell
 python -m uvicorn server.main:app --reload
 ```
 
-### 5. 클라이언트 실행
+### 4. 메인 클라이언트 실행
 
 ```powershell
 python client\main.py
 ```
 
-## Firestore 관련 메모
+### 5. Riot Loader 실행
 
-- Firestore 인증은 기본적으로 `GOOGLE_APPLICATION_CREDENTIALS` 또는 GCP 기본 인증 정보를 사용합니다.
-- `FIRESTORE_EMULATOR_HOST`가 설정되어 있으면 로컬 에뮬레이터를 사용합니다.
-- `get_recent_matches_by_riot_id` 같은 일부 조회는 Firestore에서 복합 인덱스를 요구할 수 있습니다.
+```powershell
+python -m client.tools.riot_loader
+```
 
-## 배포 문서
+더 자세한 로컬 테스트 절차는 [local_test_guild.md](local_test_guild.md) 에 정리되어 있습니다.
 
-- Cloud Run + Firestore + Docker: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md)
+## 배포 방향
+
+현재 프로젝트는 `Cloud Run + Firestore + Docker` 기준으로 배포 문서를 유지합니다.
+
+- API 서버는 Cloud Run에 배포
+- 저장 데이터는 Firestore에 보관
+- Riot API 키는 서버에 상시 보관하지 않고, 관리자 로컬 도구에서 직접 사용 가능
+- 친구 데이터는 `riot_loader`로 적재
+
+배포 절차는 [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md) 를 기준으로 진행하면 됩니다.
