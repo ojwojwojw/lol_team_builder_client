@@ -15,7 +15,13 @@ def _user_collection():
 
 def count_users() -> int:
     """현재 저장된 앱 사용자 수를 센다."""
-    return sum(1 for _ in _user_collection().stream())
+    try:
+        count = sum(1 for _ in _user_collection().stream())
+        print("APP_USERS COUNT:", count)
+        return count
+    except Exception as exc:
+        print("FIRESTORE COUNT_USERS ERROR:", repr(exc))
+        raise
 
 
 def get_user_by_username(username: str) -> dict | None:
