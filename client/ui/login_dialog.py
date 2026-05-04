@@ -34,6 +34,10 @@ class LoginDialog(QDialog):
         self.guide_label = guide
         guide.setWordWrap(True)
 
+        self.session_notice_label = QLabel("")
+        self.session_notice_label.setWordWrap(True)
+        self.session_notice_label.hide()
+
         form = QFormLayout()
         self.server_url_input = QLineEdit()
         self.server_url_input.setText(team_app.load_server_base_url())
@@ -52,18 +56,22 @@ class LoginDialog(QDialog):
 
         button_row = QHBoxLayout()
         self.bootstrap_btn = QPushButton("최초 관리자 생성")
+        self.reset_session_btn = QPushButton("저장 세션 초기화")
         self.login_btn = QPushButton("로그인")
         self.cancel_btn = QPushButton("종료")
         button_row.addWidget(self.bootstrap_btn)
+        button_row.addWidget(self.reset_session_btn)
         button_row.addWidget(self.login_btn)
         button_row.addWidget(self.cancel_btn)
 
         layout.addWidget(guide)
+        layout.addWidget(self.session_notice_label)
         layout.addLayout(form)
         layout.addLayout(button_row)
         self.setLayout(layout)
 
         self.bootstrap_btn.clicked.connect(self.bootstrap_admin)
+        self.reset_session_btn.clicked.connect(self.reset_saved_session)
         self.login_btn.clicked.connect(self.login)
         self.cancel_btn.clicked.connect(self.reject)
         self.password_input.returnPressed.connect(self.login)
@@ -88,6 +96,23 @@ class LoginDialog(QDialog):
             self.guide_label.setText(
                 "FastAPI 서버에 로그인한 뒤 클라이언트를 사용할 수 있습니다."
             )
+
+    def show_session_notice(self, message: str):
+        """저장된 토큰이 초기화되었거나 다시 로그인해야 하는 이유를 안내한다."""
+        self.session_notice_label.setText(message)
+        self.session_notice_label.show()
+
+    def reset_saved_session(self):
+        """로컬에 저장된 로그인 토큰과 사용자명을 명시적으로 초기화한다."""
+        team_app.clear_auth_token()
+        team_app.save_auth_username("")
+        self.username_input.clear()
+        self.password_input.clear()
+        self.show_session_notice(
+            "로컬에 저장된 로그인 세션을 초기화했습니다. "
+            "에뮬레이터를 비웠거나 서버 상태가 바뀐 경우 다시 로그인해주세요."
+        )
+        QMessageBox.information(self, "세션 초기화", "저장된 로그인 세션을 초기화했습니다.")
 
     def login(self):
         username, password = self._read_credentials()

@@ -52,6 +52,7 @@ class RiotLoaderApi:
         data = self.parse_json_response(response)
         if response.status_code == 401:
             team_app.clear_auth_token()
+            team_app.save_auth_username("")
         return response, data
 
     def parse_json_response(self, response):

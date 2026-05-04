@@ -83,12 +83,15 @@ python -m pip install -r server\requirements.txt
 ### 3. Firestore Emulator 기준 서버 실행
 
 ```powershell
-$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+$env:TEAM_BUILDER_FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
 $env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
 $env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
 $env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
 python -m uvicorn server.main:app --reload
 ```
+
+배포 환경에서는 `TEAM_BUILDER_FIRESTORE_EMULATOR_HOST` 를 설정하지 않으면 됩니다.  
+그러면 같은 소스코드가 자동으로 실제 Firestore에 연결됩니다.
 
 ### 4. 메인 클라이언트 실행
 
@@ -106,7 +109,7 @@ python -m client.tools.riot_loader
 
 ## 배포 방향
 
-현재 프로젝트는 `Cloud Run + Firestore + Docker` 기준으로 배포 문서를 유지합니다.
+현재 프로젝트는 `Cloud Run + Firestore` 기준으로 배포하며, 컨테이너 이미지는 `Cloud Build 원격 빌드`를 기본 경로로 사용합니다. 필요하면 Dockerfile 기반 로컬 빌드도 가능합니다. 로컬/배포는 소스코드를 나누지 않고 환경변수 설정으로 분기합니다.
 
 - API 서버는 Cloud Run에 배포
 - 저장 데이터는 Firestore에 보관

@@ -487,6 +487,7 @@ class RiotLoaderWidget(QWidget):
 
         self._close_aux_dialogs()
         team_app.clear_auth_token()
+        team_app.save_auth_username("")
         self.current_user = {}
         self.current_puuid = ""
         self.current_match_ids = []
@@ -506,6 +507,8 @@ class RiotLoaderWidget(QWidget):
 
 def ensure_admin_session(parent=None):
     existing_token = team_app.load_auth_token().strip()
+    login_dialog = LoginDialog(parent)
+    session_notice = ""
 
     if existing_token:
         try:
@@ -513,6 +516,11 @@ def ensure_admin_session(parent=None):
             if current_user.get("is_admin"):
                 return current_user
             team_app.clear_auth_token()
+            team_app.save_auth_username("")
+            session_notice = (
+                "저장된 세션은 남아 있었지만 현재 서버에서는 관리자 권한을 확인할 수 없어 "
+                "로컬 세션을 초기화했습니다. 다시 로그인해주세요."
+            )
             QMessageBox.warning(
                 parent,
                 "관리자 권한 필요",
@@ -520,8 +528,15 @@ def ensure_admin_session(parent=None):
             )
         except Exception:
             team_app.clear_auth_token()
+            team_app.save_auth_username("")
+            session_notice = (
+                "저장된 로그인 세션이 만료되었거나 현재 서버/Firestore에 해당 사용자가 없습니다. "
+                "로컬 세션을 초기화했으니 다시 로그인해주세요."
+            )
 
-    login_dialog = LoginDialog(parent)
+    if session_notice:
+        login_dialog.show_session_notice(session_notice)
+
     while True:
         if login_dialog.exec_() != LoginDialog.Accepted:
             return None
@@ -531,6 +546,7 @@ def ensure_admin_session(parent=None):
             return current_user
 
         team_app.clear_auth_token()
+        team_app.save_auth_username("")
         QMessageBox.warning(
             parent,
             "관리자 권한 필요",

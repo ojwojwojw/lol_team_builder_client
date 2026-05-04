@@ -16,3 +16,7 @@ client/data/*.json
 client/team_builder_client_error.log
 firebase-debug.log
 firestore-debug.log
+service-account.json
+gcp-service-account.json
+*.service-account.json
+firebase-emulator-data/

@@ -385,6 +385,7 @@ class MainWindow(QWidget):
             return
 
         team_app.clear_auth_token()
+        team_app.save_auth_username("")
         login_dialog = LoginDialog(self)
         if login_dialog.exec_() != LoginDialog.Accepted:
             self.close()

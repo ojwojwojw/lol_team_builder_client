@@ -7,6 +7,7 @@ from repositories.dataset_repository import (
     clear_auth_token,
     load_auth_token,
     load_server_base_url,
+    save_auth_username,
 )
 
 class BaseApiClient:
@@ -58,6 +59,7 @@ class BaseApiClient:
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 401:
                 clear_auth_token()
+                save_auth_username("")
             raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
         except URLError as exc:
             raise RuntimeError(

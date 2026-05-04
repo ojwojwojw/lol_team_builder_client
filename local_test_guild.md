@@ -7,9 +7,61 @@
 아래 4가지를 로컬에서 확인할 수 있습니다.
 
 1. FastAPI 서버 실행
-2. 클라이언트에서 서버 요청 전송
-3. `riot_loader`로 Riot 데이터 적재
-4. Firestore 상태 조회
+2. 메인 클라이언트에서 서버 요청
+3. `riot_loader` 로 Riot 데이터 적재
+4. Firestore Emulator 상태 확인
+
+## 중요한 개념
+
+### 1. 같은 소스코드를 사용한다
+
+로컬용 소스와 배포용 소스를 따로 두지 않습니다.
+
+- 로컬 개발: `TEAM_BUILDER_FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`
+- 배포 환경: `TEAM_BUILDER_FIRESTORE_EMULATOR_HOST` 를 설정하지 않음
+
+즉, 같은 코드베이스가 환경변수에 따라
+- 로컬에서는 Firestore Emulator
+- 배포에서는 실제 Firestore
+를 바라보게 됩니다.
+
+### 2. 클라이언트 로그인 상태는 Firestore와 별개로 로컬에 저장된다
+
+메인 클라이언트와 `riot_loader` 는 로그인 토큰을 아래 파일에 저장합니다.
+
+- [client/data/config.json](client/data/config.json)
+
+여기에는 아래 값이 들어갑니다.
+
+- `auth_token`
+- `auth_username`
+
+즉 Firestore Emulator 데이터를 지워도, 클라이언트 로컬에는 예전 토큰이 남아 있을 수 있습니다.
+
+그래서 에뮬레이터를 초기화한 뒤에는:
+- 서버에서 실제 `admin` 문서가 없어졌는데
+- 클라이언트가 여전히 `admin`으로 로그인했던 흔적을 갖고 있을 수 있습니다.
+
+보통은 서버 요청 시 401이 나면서 토큰이 정리되지만,
+테스트를 깔끔하게 하려면 에뮬레이터 초기화와 함께 `config.json`의 `auth_token`도 같이 비우는 게 좋습니다.
+
+### 3. Emulator 데이터는 기본적으로 영구 저장이 아니다
+
+Firestore Emulator는 기본적으로 메모리성 테스트 DB에 가깝습니다.
+
+아래처럼 실행하면:
+
+```powershell
+firebase.cmd emulators:start --only firestore --project demo-team-builder-local --import .\firebase-emulator-data --export-on-exit
+```
+
+종료 시점에 데이터를 `firebase-emulator-data` 폴더로 내보내고, 다음 실행 때 다시 가져옵니다.
+
+정리:
+- `--import` 없이 실행하면: 보통 재시작 시 데이터가 사라진다고 생각하는 편이 안전
+- `--export-on-exit` 없이 종료하면: 저장되지 않음
+- 강제 종료되면: export가 안 될 수 있음
+- `firebase-emulator-data` 폴더가 없으면: 이전 데이터가 남지 않은 상태
 
 ## 사전 준비
 
@@ -54,14 +106,14 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
 .\.venv\Scripts\activate
 pip install -r server\requirements.txt
-$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+$env:TEAM_BUILDER_FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
 $env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
 $env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
 $env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
 python -m uvicorn server.main:app --reload
 ```
 
-Riot API 키를 서버에 숨기고 테스트하려면 추가:
+선택:
 
 ```powershell
 $env:TEAM_BUILDER_RIOT_API_KEY="여기에_라이엇_API_키"
@@ -75,7 +127,7 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 
 ## 3. 관리자 계정 생성
 
-PowerShell 창 3 또는 같은 창에서 별도 실행:
+PowerShell 창 3:
 
 ```powershell
 Invoke-RestMethod `
@@ -85,11 +137,11 @@ Invoke-RestMethod `
   -Body '{"username":"admin","password":"admin12345"}'
 ```
 
-이미 계정이 있으면 `409` 응답이 나올 수 있으며, 그 경우 기존 계정을 그대로 쓰면 됩니다.
+이미 계정이 있으면 `409` 응답이 나올 수 있습니다.
 
-## 4. 클라이언트 실행
+## 4. 메인 클라이언트 실행
 
-PowerShell 창 3:
+PowerShell 창 4:
 
 ```powershell
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
@@ -97,7 +149,7 @@ cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
 python client\main.py
 ```
 
-클라이언트 설정에서 서버 주소를 아래로 맞춥니다.
+서버 주소는:
 
 ```text
 http://127.0.0.1:8000
@@ -105,7 +157,7 @@ http://127.0.0.1:8000
 
 ## 5. Riot Loader 실행
 
-PowerShell 창 4:
+PowerShell 창 5:
 
 ```powershell
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
@@ -119,21 +171,9 @@ python -m client.tools.riot_loader
 - 비밀번호: `admin12345`
 - 서버 주소: `http://127.0.0.1:8000`
 
-`riot_loader` 테스트 순서:
-
-1. `1. PUUID 조회`
-2. `2. 매치 ID 조회`
-3. `3. 한 경기 상세 조회`
-4. `4. 최근 경기 DB 적재`
-
-주의:
-
-- 현재 `riot_loader` UI는 `Riot API Key` 입력칸을 비우면 진행을 막습니다.
-- 서버 환경변수에 Riot 키를 넣었더라도, 현재 UI 테스트에서는 입력칸에도 키를 넣는 편이 안전합니다.
-
 ## 6. Firestore 상태 확인
 
-### 브라우저 UI
+### Emulator UI
 
 브라우저에서:
 
@@ -141,68 +181,99 @@ python -m client.tools.riot_loader
 http://127.0.0.1:4000
 ```
 
-여기서 컬렉션과 문서를 확인할 수 있습니다.
-
-예상 컬렉션:
+여기서 아래 컬렉션을 확인할 수 있습니다.
 
 - `app_users`
 - `riot_accounts`
 - `matches`
 - `match_participants`
 
-### Firestore 모니터 GUI
+### Firestore 모니터 도구
 
 PowerShell 창 6:
 
 ```powershell
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
 .\.venv\Scripts\activate
-$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+$env:TEAM_BUILDER_FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
 $env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
 python server\tools\firestore_monitor.py
 ```
 
-이 도구에서 볼 수 있는 것:
+또는 `riot_loader` 안의 `Firestore 관리` 팝업을 쓰는 편이 더 편합니다.
 
-- 컬렉션별 문서 수
-- 컬렉션별 대략적인 JSON 크기
-- 문서 ID 목록
-- 선택 문서의 JSON 상세
+## 7. 에뮬레이터를 껐다 켰을 때 데이터가 안 남는 경우
 
-## 7. 종료 후 데이터 유지
+아래를 확인하세요.
 
-에뮬레이터를 아래처럼 실행했기 때문에:
+1. `firebase-emulator-data` 폴더가 실제로 생겼는지
+2. Emulator를 `Ctrl+C`로 정상 종료했는지
+3. `--import .\firebase-emulator-data --export-on-exit` 옵션을 계속 사용했는지
+4. 프로젝트 루트에서 실행했는지
 
-```powershell
-firebase.cmd emulators:start --only firestore --project demo-team-builder-local --import .\firebase-emulator-data --export-on-exit
+현재 폴더에 `firebase-emulator-data` 가 없다면, 이전 export가 안 된 상태일 가능성이 큽니다.
+
+## 8. 에뮬레이터 초기화 후 admin이 없는데 로그인된 것처럼 보일 때
+
+이건 대부분 클라이언트 로컬 토큰 때문입니다.
+
+확인 파일:
+
+- [client/data/config.json](client/data/config.json)
+
+여기서 아래 항목을 비우면 됩니다.
+
+```json
+"auth_token": "",
+"auth_username": ""
 ```
 
-종료 시 데이터가 `firebase-emulator-data` 폴더로 저장되고, 다음 실행 때 다시 불러옵니다.
+또는 아래 방법을 사용할 수 있습니다.
 
-## 문제 해결
+- 로그인 창의 `저장 세션 초기화` 버튼
+- 앱 안의 `로그아웃` 버튼
 
-### emulator가 바로 종료될 때
+추천 순서:
+
+1. Emulator 초기화
+2. `client/data/config.json` 의 `auth_token` / `auth_username` 비우기
+3. 서버 재실행
+4. `/auth/bootstrap-admin` 으로 admin 다시 생성
+5. 메인 클라이언트 / `riot_loader` 재로그인
+
+## 9. 완전 초기화 순서
+
+테스트 상태를 완전히 새로 만들고 싶을 때:
+
+1. Firestore Emulator 종료
+2. `firebase-emulator-data` 폴더 삭제
+3. `client/data/config.json` 에서 `auth_token`, `auth_username` 비우기
+4. Emulator 재실행
+5. 서버 재실행
+6. admin 재생성
+
+## 10. 자주 막히는 문제
+
+### Emulator가 바로 종료될 때
 
 ```powershell
 firebase.cmd emulators:start --only firestore --project demo-team-builder-local --debug
 ```
 
-### PowerShell에서 명령이 막힐 때
+### PowerShell 실행 정책 문제
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-### firebase/nmp가 인식되지 않을 때
+### firebase / npm 인식이 안 될 때
 
 ```powershell
 firebase.cmd --version
 npm.cmd -v
 ```
 
-### 서버 import 에러가 날 때
-
-먼저 의존성 설치:
+### 서버 import 오류가 날 때
 
 ```powershell
 pip install -r server\requirements.txt
