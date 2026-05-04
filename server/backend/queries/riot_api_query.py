@@ -2,6 +2,8 @@ from urllib.parse import quote
 
 import requests
 
+from ..config import get_riot_api_key
+
 
 ASIA_ROUTING_BASE_URL = "https://asia.api.riotgames.com"
 KR_PLATFORM_BASE_URL = "https://kr.api.riotgames.com"
@@ -20,9 +22,24 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
     }
 
 
-def fetch_riot_json(url: str, api_key: str, error_msg: str):
+def _resolve_api_key(api_key: str | None) -> str | None:
+    provided_key = (api_key or "").strip()
+    if provided_key:
+        return provided_key
+    return get_riot_api_key()
+
+
+def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
     """Perform one Riot GET request with shared header and error handling."""
-    headers = {"X-Riot-Token": api_key}
+    resolved_api_key = _resolve_api_key(api_key)
+    if not resolved_api_key:
+        return None, {
+            "error": "Riot API key is not configured",
+            "status": 0,
+            "riot_response": "Set TEAM_BUILDER_RIOT_API_KEY or pass api_key in the request.",
+        }
+
+    headers = {"X-Riot-Token": resolved_api_key}
     try:
         response = requests.get(url, headers=headers, timeout=10)
     except requests.RequestException as exc:
@@ -36,7 +53,7 @@ def fetch_riot_json(url: str, api_key: str, error_msg: str):
     return response.json(), None
 
 
-def fetch_account(game_name: str, tag_line: str, api_key: str) -> dict:
+def fetch_account(game_name: str, tag_line: str, api_key: str | None) -> dict:
     """Fetch Riot account info from Riot ID."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/riot/account/v1/accounts/by-riot-id/"
@@ -53,7 +70,7 @@ def fetch_account(game_name: str, tag_line: str, api_key: str) -> dict:
     }
 
 
-def fetch_summoner_by_puuid(puuid: str, api_key: str) -> dict:
+def fetch_summoner_by_puuid(puuid: str, api_key: str | None) -> dict:
     """Fetch summoner payload needed for ranked lookup."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/summoner/v4/summoners/by-puuid/"
@@ -74,7 +91,7 @@ def fetch_summoner_by_puuid(puuid: str, api_key: str) -> dict:
     }
 
 
-def fetch_ranked_entries(puuid: str, api_key: str) -> dict:
+def fetch_ranked_entries(puuid: str, api_key: str | None) -> dict:
     """Fetch ranked queue entries for one encrypted puuid."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/league/v4/entries/by-puuid/"
@@ -110,7 +127,7 @@ def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
     return sorted_entries[0]
 
 
-def fetch_match_ids(puuid: str, api_key: str, count: int = 5) -> dict:
+def fetch_match_ids(puuid: str, api_key: str | None, count: int = 5) -> dict:
     """Fetch recent match ids for one puuid."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/by-puuid/"
@@ -122,7 +139,7 @@ def fetch_match_ids(puuid: str, api_key: str, count: int = 5) -> dict:
     return {"puuid": puuid, "match_ids": match_ids, "count": count}
 
 
-def fetch_match_detail(match_id: str, api_key: str) -> dict:
+def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
     """Fetch one match detail and pre-build a small summary structure."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/"

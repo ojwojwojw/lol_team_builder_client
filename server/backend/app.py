@@ -5,7 +5,6 @@ from .config import get_allowed_origins
 from .controllers.auth_controller import router as auth_router
 from .controllers.match_controller import router as match_router
 from .controllers.riot_controller import router as riot_router
-from .database import init_db
 
 
 def create_app() -> FastAPI:
@@ -28,10 +27,6 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health_check() -> dict[str, str]:
         return {"status": "ok"}
-
-    @app.on_event("startup")
-    def on_startup() -> None:
-        init_db()
 
     return app
 

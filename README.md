@@ -1,71 +1,86 @@
 # LOL Team Builder
 
-리그 오브 레전드 내전 팀 밸런싱을 위한 데스크톱 클라이언트와 FastAPI 서버를 함께 관리하는 저장소입니다.
+리그 오브 레전드 내전 밸런싱을 돕는 데스크톱 클라이언트와 FastAPI 서버 프로젝트입니다.
+
+현재 서버 저장소는 `SQLite`가 아니라 `Firestore`를 사용합니다. 최근 경기 데이터와 Riot 계정 메타데이터, 앱 사용자 계정은 Firestore에 저장됩니다.
 
 ## 프로젝트 구조
 
 - `client/`
-  데스크톱 클라이언트 코드가 들어 있습니다.
-- `client/application/`
-  계정 조회, 최근 전적 요약, 팀 생성, 결과 포맷팅 같은 애플리케이션 흐름을 담당합니다.
-- `client/api_clients/`
-  서버 API 통신을 담당합니다.
+  - 데스크톱 클라이언트 코드
 - `client/domain/`
-  팀 밸런싱 계산, 포지션 규칙, 도메인 상수를 담당합니다.
-- `client/repositories/`
-  로컬 JSON 데이터와 설정 파일 입출력을 담당합니다.
-- `client/ui/`
-  윈도우, 다이얼로그, 위젯, UI 테마를 담당합니다.
-- `client/tools/riot_loader.py`
-  저장된 Riot 계정 또는 수동 입력으로 최근 경기 데이터를 적재하는 도구입니다.
+  - 팀 생성 알고리즘과 밸런스 계산 로직
+- `client/tools/`
+  - Riot 데이터 적재용 보조 도구
 - `server/`
-  FastAPI 서버와 백엔드 모듈이 들어 있습니다.
-- `patch_notes/`
-  날짜별 패치노트를 보관합니다.
+  - FastAPI 서버
+- `deploy/gcp/`
+  - GCP 배포 관련 문서와 설정
 
-## 주요 기능
+## 현재 서버 아키텍처
 
-- 10명을 기준으로 밸런스 있는 5:5 팀을 생성합니다.
-- 최근 경기 전적을 기반으로 승률, KDA, 포지션 통계, 챔피언 통계를 분석합니다.
-- 최근 폼과 포지션 적합도를 팀 계산에 반영합니다.
-- 라인 밸런스 경고와 완화 규칙 적용 여부를 함께 안내합니다.
-- Riot API 기반 계정 및 경기 데이터를 클라이언트 도구에서 적재할 수 있습니다.
+- 앱 사용자 계정 저장: `app_users`
+- Riot 계정 메타데이터 저장: `riot_accounts`
+- 경기 요약/원본 저장: `matches`
+- 참가자 인덱스 저장: `match_participants`
 
-## 실행 가이드
+Riot API 키는 요청 바디로 넘길 수도 있고, 서버 환경변수 `TEAM_BUILDER_RIOT_API_KEY`에 넣어 숨길 수도 있습니다.
 
-### 가상환경 활성화
+## 로컬 실행
+
+### 1. 가상환경 활성화
 
 ```powershell
 cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
 .\.venv\Scripts\activate
 ```
 
-### 클라이언트 실행
+### 2. 서버 의존성 설치
 
 ```powershell
-python client\main.py
+pip install -r server\requirements.txt
 ```
 
-### Riot 데이터 로더 실행
+### 3. Firestore 접속 환경변수 설정
+
+실서비스 Firestore를 쓸 때:
 
 ```powershell
-python -m client.tools.riot_loader
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
+$env:TEAM_BUILDER_FIRESTORE_PROJECT="your-gcp-project-id"
+$env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
+$env:TEAM_BUILDER_JWT_SECRET="replace-with-a-long-random-secret"
+$env:TEAM_BUILDER_RIOT_API_KEY="your-riot-api-key"
 ```
 
-### 서버 실행
+로컬 테스트에서 Firestore Emulator를 쓸 때:
+
+```powershell
+$env:FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+$env:TEAM_BUILDER_FIRESTORE_PROJECT="team-builder-local"
+$env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
+$env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
+$env:TEAM_BUILDER_RIOT_API_KEY="your-riot-api-key"
+```
+
+### 4. 서버 실행
 
 ```powershell
 python -m uvicorn server.main:app --reload
 ```
 
-### 클라이언트 빌드
+### 5. 클라이언트 실행
 
 ```powershell
-pyinstaller client\main.spec
+python client\main.py
 ```
 
-## 데이터 및 산출물
+## Firestore 관련 메모
 
-- 클라이언트 런타임 데이터는 `client/data/` 아래에 저장됩니다.
-- `dist/`는 빌드 산출물 디렉토리이며 Git 추적 대상에서 제외됩니다.
-- 클라이언트 오류 로그는 `client/team_builder_client_error.log`에 기록되며 Git 추적 대상에서 제외됩니다.
+- Firestore 인증은 기본적으로 `GOOGLE_APPLICATION_CREDENTIALS` 또는 GCP 기본 인증 정보를 사용합니다.
+- `FIRESTORE_EMULATOR_HOST`가 설정되어 있으면 로컬 에뮬레이터를 사용합니다.
+- `get_recent_matches_by_riot_id` 같은 일부 조회는 Firestore에서 복합 인덱스를 요구할 수 있습니다.
+
+## 배포 문서
+
+- Compute Engine + Docker: [deploy/gcp/DEPLOY_GCP_COMPUTE_ENGINE_DOCKER.md](deploy/gcp/DEPLOY_GCP_COMPUTE_ENGINE_DOCKER.md)

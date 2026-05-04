@@ -1,0 +1,21 @@
+[Unit]
+Description=Team Builder API Docker Container
+After=docker.service network.target
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStartPre=-/usr/bin/docker stop team-builder-api
+ExecStartPre=-/usr/bin/docker rm team-builder-api
+ExecStart=/usr/bin/docker run \
+  --name team-builder-api \
+  --env-file /opt/team_builder/server.env \
+  --volume /opt/team_builder/secrets:/app/secrets:ro \
+  --publish 127.0.0.1:8000:8000 \
+  team-builder-api
+ExecStop=/usr/bin/docker stop team-builder-api
+
+[Install]
+WantedBy=multi-user.target

@@ -80,7 +80,7 @@ def get_current_user(
         raise _unauthorized("Authentication required.")
 
     payload = decode_access_token(credentials.credentials)
-    user_id = int(payload.get("sub", 0) or 0)
+    user_id = str(payload.get("sub", "") or "").strip()
     user = get_user_by_id(user_id)
     if not user or not user.get("is_active"):
         raise _unauthorized("User is missing or inactive.")

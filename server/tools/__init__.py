@@ -1,1 +1,1 @@
-# Developer tools that access the local SQLite database directly.
+# Developer tools for inspecting local development storage.

@@ -1,6 +1,8 @@
-from ..database import DB_PATH, get_connection, init_db
-from ..queries.match_read_query import MatchReadQuery
-from ..queries.match_write_query import MatchWriteQuery
+from ..firestore_store import (
+    get_existing_match_ids,
+    store_match_bundle,
+    upsert_account,
+)
 from ..queries.riot_api_query import (
     fetch_account,
     fetch_match_detail,
@@ -16,7 +18,6 @@ class RiotService:
     # It connects controller input to query calls and shapes the response.
 
     def get_puuid(self, game_name: str, tag_line: str, api_key: str) -> dict:
-        """Look up puuid from Riot ID and return only the fields needed by the API."""
         result = fetch_account(game_name, tag_line, api_key)
         if "error" in result:
             return result
@@ -27,11 +28,9 @@ class RiotService:
         }
 
     def get_match_ids(self, puuid: str, api_key: str, count: int) -> dict:
-        """Fetch recent match ids for a given puuid."""
         return fetch_match_ids(puuid, api_key, count)
 
     def get_match_detail(self, match_id: str, api_key: str) -> dict:
-        """Fetch one match and return a UI-friendly summary payload."""
         result = fetch_match_detail(match_id, api_key)
         if "error" in result:
             return result
@@ -44,7 +43,6 @@ class RiotService:
         }
 
     def _build_stored_account_payload(self, account_result: dict, api_key: str) -> dict:
-        """Build one DB-ready riot_account payload including ranked metadata."""
         puuid = account_result["puuid"]
         payload = {
             "puuid": puuid,
@@ -88,11 +86,7 @@ class RiotService:
         return payload
 
     def refresh_account_tier(self, game_name: str, tag_line: str, api_key: str) -> dict:
-        """Refresh one riot_account row from Riot APIs without fetching matches."""
-        conn = None
         try:
-            init_db()
-
             account_result = fetch_account(game_name, tag_line, api_key)
             if "error" in account_result:
                 return account_result
@@ -101,11 +95,7 @@ class RiotService:
                 account_result,
                 api_key,
             )
-
-            conn = get_connection()
-            match_write_query = MatchWriteQuery(conn)
-            match_write_query.store_account(stored_account_payload)
-            match_write_query.commit()
+            upsert_account(stored_account_payload)
 
             return {
                 "game_name": stored_account_payload.get("game_name"),
@@ -119,7 +109,7 @@ class RiotService:
                 "wins": stored_account_payload.get("wins"),
                 "losses": stored_account_payload.get("losses"),
                 "tier_sync_warning": stored_account_payload.get("tier_sync_warning"),
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
             }
         except Exception as exc:
             return {
@@ -127,14 +117,10 @@ class RiotService:
                 "game_name": game_name,
                 "tag_line": tag_line,
                 "detail": str(exc),
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
             }
-        finally:
-            if conn is not None:
-                conn.close()
 
     def refresh_account_tiers_for_accounts(self, accounts: list[dict], api_key: str) -> dict:
-        """Refresh tier metadata only for selected riot_account rows."""
         normalized_accounts = []
         seen = set()
 
@@ -160,7 +146,7 @@ class RiotService:
                 "processed_account_count": 0,
                 "results": [],
                 "failed_accounts": [],
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
                 "error": "No valid accounts were provided",
             }
 
@@ -187,17 +173,13 @@ class RiotService:
             "processed_account_count": len(normalized_accounts),
             "results": results,
             "failed_accounts": failed_accounts,
-            "db_path": str(DB_PATH.resolve()),
+            "storage": "firestore",
         }
 
     def store_recent_matches(
         self, game_name: str, tag_line: str, api_key: str, count: int = 5
     ) -> dict:
-        """Fetch account and recent matches, then store each layer into SQLite."""
-        conn = None
         try:
-            init_db()
-
             account_result = fetch_account(game_name, tag_line, api_key)
             if "error" in account_result:
                 return account_result
@@ -206,29 +188,21 @@ class RiotService:
                 account_result,
                 api_key,
             )
+            upsert_account(stored_account_payload)
 
             puuid = account_result["puuid"]
             match_ids_result = fetch_match_ids(puuid, api_key, count)
             if "error" in match_ids_result:
                 return match_ids_result
 
-            conn = get_connection()
-            match_read_query = MatchReadQuery(conn)
-            match_write_query = MatchWriteQuery(conn)
-            match_write_query.store_account(stored_account_payload)
-
             requested_match_ids = [
                 (match_id or "").strip()
                 for match_id in match_ids_result["match_ids"]
                 if (match_id or "").strip()
             ]
-            existing_match_ids = match_read_query.get_existing_match_ids(
-                requested_match_ids
-            )
+            existing_match_ids = get_existing_match_ids(requested_match_ids)
             pending_match_ids = [
-                match_id
-                for match_id in requested_match_ids
-                if match_id not in existing_match_ids
+                match_id for match_id in requested_match_ids if match_id not in existing_match_ids
             ]
 
             stored_match_ids = []
@@ -246,17 +220,8 @@ class RiotService:
                     continue
 
                 match_data = match_result.get("raw_match") or {}
-                match_write_query.store_match_summary(match_data)
-                match_write_query.store_teams(
-                    match_id, match_data.get("info", {}).get("teams", [])
-                )
-                match_write_query.store_participants(
-                    match_id,
-                    match_data.get("info", {}).get("participants", []),
-                )
+                store_match_bundle(match_id, match_data)
                 stored_match_ids.append(match_id)
-
-            match_write_query.commit()
 
             return {
                 "game_name": stored_account_payload.get("game_name"),
@@ -276,7 +241,7 @@ class RiotService:
                 "stored_match_ids": stored_match_ids,
                 "stored_count": len(stored_match_ids),
                 "failed_matches": failed_matches,
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
             }
         except Exception as exc:
             return {
@@ -285,16 +250,12 @@ class RiotService:
                 "tag_line": tag_line,
                 "requested_count": count,
                 "detail": str(exc),
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
             }
-        finally:
-            if conn is not None:
-                conn.close()
 
     def store_recent_matches_for_accounts(
         self, accounts: list[dict], api_key: str, count: int = 5
     ) -> dict:
-        """Repeat the existing single-account save flow for selected stored accounts."""
         normalized_accounts = []
         seen = set()
 
@@ -322,7 +283,7 @@ class RiotService:
                 "results": [],
                 "failed_accounts": [],
                 "stored_match_total": 0,
-                "db_path": str(DB_PATH.resolve()),
+                "storage": "firestore",
                 "error": "No valid accounts were provided",
             }
 
@@ -356,5 +317,5 @@ class RiotService:
             "results": results,
             "failed_accounts": failed_accounts,
             "stored_match_total": stored_match_total,
-            "db_path": str(DB_PATH.resolve()),
+            "storage": "firestore",
         }

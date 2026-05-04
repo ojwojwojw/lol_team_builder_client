@@ -21,6 +21,25 @@ def get_jwt_secret() -> str | None:
     return secret or None
 
 
+def get_riot_api_key() -> str | None:
+    api_key = os.getenv("TEAM_BUILDER_RIOT_API_KEY", "").strip()
+    if api_key:
+        return api_key
+
+    legacy_api_key = os.getenv("RIOT_API_KEY", "").strip()
+    return legacy_api_key or None
+
+
+def get_firestore_project() -> str | None:
+    project = os.getenv("TEAM_BUILDER_FIRESTORE_PROJECT", "").strip()
+    return project or None
+
+
+def get_firestore_database() -> str | None:
+    database = os.getenv("TEAM_BUILDER_FIRESTORE_DATABASE", "").strip()
+    return database or None
+
+
 def get_allowed_origins() -> list[str]:
     raw_origins = os.getenv("TEAM_BUILDER_CORS_ORIGINS", "").strip()
     if not raw_origins:
