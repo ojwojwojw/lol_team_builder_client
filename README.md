@@ -10,7 +10,6 @@
 따라서 사용자는 로컬 앱을 실행해서 유저를 관리하고 팀을 만들며, 백엔드는 계정/최근 매치 데이터를 조회하는 지원 역할을 맡습니다.
 
 ![Architecture Overview](docs/images/architecture-overview.svg)
-![Client Flow Overview](docs/images/client-flow-overview.svg)
 
 ## 프로젝트 목적
 
