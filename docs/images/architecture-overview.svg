@@ -1,22 +1,21 @@
 <svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="760" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F5F7FA"/>
-      <stop offset="1" stop-color="#E9EFF5"/>
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#EAF0F6"/>
     </linearGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.10"/>
     </filter>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-      <path d="M0 0L10 5L0 10Z" fill="#4B5563"/>
+      <path d="M0 0L10 5L0 10Z" fill="#475569"/>
     </marker>
     <style>
       .title { font: 700 34px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #0F172A; }
       .subtitle { font: 500 16px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #475569; }
-      .box-title { font: 700 24px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #0F172A; }
-      .box-body { font: 500 16px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #334155; }
-      .mini { font: 600 14px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #475569; }
-      .label { font: 600 15px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #1F2937; }
+      .box-title { font: 700 22px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #0F172A; }
+      .box-body { font: 500 15px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #334155; }
+      .label { font: 700 15px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #1F2937; }
       .capsule { font: 700 13px 'Segoe UI', 'Noto Sans KR', sans-serif; fill: #0F172A; }
     </style>
   </defs>
@@ -24,64 +23,63 @@
   <rect width="1200" height="760" rx="28" fill="url(#bg)"/>
 
   <text x="72" y="82" class="title">LOL Team Builder Architecture</text>
-  <text x="72" y="114" class="subtitle">로컬 팀 생성 알고리즘이 중심이고, 클라우드는 Riot 데이터 저장과 운영 도구를 지원하는 보조 계층입니다.</text>
+  <text x="72" y="114" class="subtitle">데스크톱 앱 중심 구조. 팀 생성은 로컬에서 실행되고, 서버는 저장된 계정/매치 데이터를 보조적으로 제공한다.</text>
 
-  <rect x="72" y="170" width="300" height="244" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="104" y="220" class="box-title">Main Desktop Client</text>
-  <text x="104" y="258" class="box-body">• PyQt5 main application</text>
-  <text x="104" y="288" class="box-body">• Dataset editing</text>
-  <text x="104" y="318" class="box-body">• Team generation</text>
-  <text x="104" y="348" class="box-body">• Recent match browsing</text>
-  <rect x="104" y="366" width="192" height="30" rx="15" fill="#DBEAFE"/>
-  <text x="120" y="386" class="capsule">core: client/domain/team_builder.py</text>
+  <rect x="70" y="180" width="300" height="240" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="102" y="224" class="box-title">Main Desktop Client</text>
+  <text x="102" y="258" class="box-body">• PyQt5 desktop application</text>
+  <text x="102" y="286" class="box-body">• Dataset editing and player table</text>
+  <text x="102" y="314" class="box-body">• Account search and match browsing</text>
+  <text x="102" y="342" class="box-body">• Team generation and result copy</text>
+  <rect x="102" y="364" width="176" height="28" rx="14" fill="#DBEAFE"/>
+  <text x="118" y="383" class="capsule">user-facing product</text>
 
-  <rect x="72" y="454" width="300" height="224" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="104" y="504" class="box-title">Riot Loader</text>
-  <text x="104" y="542" class="box-body">• Admin-only local tool</text>
-  <text x="104" y="572" class="box-body">• Manual / scheduled ingestion</text>
-  <text x="104" y="602" class="box-body">• Firestore monitoring</text>
-  <text x="104" y="632" class="box-body">• Cleanup / retention controls</text>
+  <rect x="70" y="460" width="300" height="210" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="102" y="504" class="box-title">Local Domain Logic</text>
+  <text x="102" y="538" class="box-body">• Team balancing algorithm</text>
+  <text x="102" y="566" class="box-body">• Tier and role weighting</text>
+  <text x="102" y="594" class="box-body">• Recent form bonus calculation</text>
+  <rect x="102" y="616" width="218" height="28" rx="14" fill="#DCFCE7"/>
+  <text x="118" y="635" class="capsule">client/domain/team_builder.py</text>
 
-  <rect x="454" y="240" width="292" height="370" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="486" y="290" class="box-title">Cloud Run API</text>
-  <text x="486" y="328" class="box-body">• FastAPI service</text>
-  <text x="486" y="358" class="box-body">• JWT auth / admin endpoints</text>
-  <text x="486" y="388" class="box-body">• Match / account queries</text>
-  <text x="486" y="418" class="box-body">• Firestore admin API</text>
-  <text x="486" y="448" class="box-body">• /health endpoint</text>
-  <rect x="486" y="484" width="206" height="30" rx="15" fill="#DCFCE7"/>
-  <text x="502" y="504" class="capsule">deploy: Docker → Cloud Run</text>
-  <rect x="486" y="528" width="214" height="30" rx="15" fill="#FEF3C7"/>
-  <text x="502" y="548" class="capsule">runtime env: PORT / Firestore / JWT</text>
+  <rect x="450" y="200" width="300" height="270" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="482" y="244" class="box-title">Cloud Run API</text>
+  <text x="482" y="278" class="box-body">• FastAPI backend</text>
+  <text x="482" y="306" class="box-body">• JWT authentication</text>
+  <text x="482" y="334" class="box-body">• Account lookup</text>
+  <text x="482" y="362" class="box-body">• Recent match and detail lookup</text>
+  <text x="482" y="390" class="box-body">• Health and admin endpoints</text>
+  <rect x="482" y="414" width="166" height="28" rx="14" fill="#FEF3C7"/>
+  <text x="498" y="433" class="capsule">supporting backend</text>
 
-  <rect x="824" y="170" width="304" height="244" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="856" y="220" class="box-title">Cloud Firestore</text>
-  <text x="856" y="258" class="box-body">• app_users</text>
-  <text x="856" y="288" class="box-body">• riot_accounts</text>
-  <text x="856" y="318" class="box-body">• matches</text>
-  <text x="856" y="348" class="box-body">• match_participants</text>
-  <rect x="856" y="366" width="184" height="30" rx="15" fill="#E0E7FF"/>
-  <text x="872" y="386" class="capsule">persistent storage layer</text>
+  <rect x="450" y="510" width="300" height="160" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="482" y="554" class="box-title">Security Layer</text>
+  <text x="482" y="588" class="box-body">• Bearer token validation</text>
+  <text x="482" y="616" class="box-body">• Active user check</text>
+  <text x="482" y="644" class="box-body">• Admin-only protected actions</text>
 
-  <rect x="824" y="454" width="304" height="224" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="856" y="504" class="box-title">Riot API</text>
-  <text x="856" y="542" class="box-body">• Match history fetch</text>
-  <text x="856" y="572" class="box-body">• Summoner / rank metadata</text>
-  <text x="856" y="602" class="box-body">• Used mainly by local admin flow</text>
-  <rect x="856" y="624" width="204" height="30" rx="15" fill="#FCE7F3"/>
-  <text x="872" y="644" class="capsule">API key managed locally</text>
+  <rect x="830" y="180" width="300" height="240" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="862" y="224" class="box-title">Cloud Firestore</text>
+  <text x="862" y="258" class="box-body">• app_users</text>
+  <text x="862" y="286" class="box-body">• riot_accounts</text>
+  <text x="862" y="314" class="box-body">• matches</text>
+  <text x="862" y="342" class="box-body">• match_participants</text>
+  <rect x="862" y="364" width="170" height="28" rx="14" fill="#E0E7FF"/>
+  <text x="878" y="383" class="capsule">persistent data layer</text>
 
-  <path d="M372 292H454" stroke="#4B5563" stroke-width="4" marker-end="url(#arrow)"/>
-  <path d="M372 566H454" stroke="#4B5563" stroke-width="4" marker-end="url(#arrow)"/>
-  <path d="M746 340H824" stroke="#4B5563" stroke-width="4" marker-end="url(#arrow)"/>
-  <path d="M824 374H746" stroke="#4B5563" stroke-width="4" marker-end="url(#arrow)"/>
+  <rect x="830" y="460" width="300" height="210" rx="24" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="862" y="504" class="box-title">Riot Data Source</text>
+  <text x="862" y="538" class="box-body">• Riot account identity</text>
+  <text x="862" y="566" class="box-body">• Match history and detail</text>
+  <text x="862" y="594" class="box-body">• Ranked metadata</text>
+  <rect x="862" y="616" width="184" height="28" rx="14" fill="#FCE7F3"/>
+  <text x="878" y="635" class="capsule">admin ingestion workflow</text>
 
-  <path d="M978 454V430C978 406 958 388 934 388H746" stroke="#7C3AED" stroke-width="4" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
-  <text x="838" y="430" class="label">ingestion flow</text>
+  <path d="M370 300H450" stroke="#475569" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M370 560H450" stroke="#475569" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M750 320H830" stroke="#475569" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M980 460V420" stroke="#7C3AED" stroke-width="4" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+  <text x="912" y="444" class="label">ingestion</text>
 
-  <path d="M980 170V146C980 122 960 104 936 104H268C244 104 224 122 224 146V170" stroke="#0EA5E9" stroke-width="4" stroke-dasharray="10 10"/>
-  <text x="466" y="152" class="mini">desktop-first product</text>
-
-  <rect x="454" y="646" width="674" height="54" rx="18" fill="#FFFFFF" filter="url(#shadow)"/>
-  <text x="482" y="680" class="label">권장 운영: 메인 앱은 저장된 Firestore 데이터를 읽고, Riot 적재와 정리는 로컬 관리자 도구에서 수행</text>
+  <rect x="70" y="698" width="1060" height="24" rx="12" fill="#FFFFFF" filter="url(#shadow)"/>
 </svg>

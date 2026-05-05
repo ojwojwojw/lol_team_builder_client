@@ -1,121 +1,261 @@
 # LOL Team Builder
 
-👉 [최신 빌드 버전 다운로드](https://github.com/ojwojwojw/lol_team_builder/releases/latest)
+👉 [최신 빌드 버전 다운로드](https://github.com/ojwojwojw/lol_team_builder/releases/latest)  
+🌍 [English README for Riot Review](README_EN.md)
 
-로컬 팀 생성 알고리즘을 중심으로 두고, Riot 전적 데이터는 `보정`과 `운영 데이터 축적`에 사용하는 데스크톱 + API 프로젝트입니다.
+`LOL Team Builder`는 **League of Legends 내전 / 커스텀 게임용 밸런스 팀 생성 데스크톱 앱**입니다.  
+핵심은 로컬에서 실행되는 팀 생성 알고리즘이며, 서버는 이를 대체하지 않고 **저장된 계정 정보와 최근 경기 데이터를 보조적으로 제공**합니다.
 
-핵심은 [client/domain/team_builder.py](client/domain/team_builder.py) 의 팀 생성 로직입니다.  
-클라우드 쪽은 이 핵심을 대체하는 것이 아니라, `저장된 Riot 계정`, `최근 경기 데이터`, `관리 도구`를 제공하는 보조 계층입니다.
+이 프로젝트는 웹사이트가 아니라 **PyQt5 기반 데스크톱 애플리케이션**입니다.  
+따라서 사용자는 로컬 앱을 실행해서 유저를 관리하고 팀을 만들며, 백엔드는 계정/최근 매치 데이터를 조회하는 지원 역할을 맡습니다.
 
 ![Architecture Overview](docs/images/architecture-overview.svg)
+![Client Flow Overview](docs/images/client-flow-overview.svg)
 
-## 컨셉
+## 프로젝트 목적
 
-- 팀 생성 알고리즘은 로컬에서 바로 실행됩니다.
-- 메인 클라이언트는 Firestore에 저장된 Riot 계정과 최근 경기 데이터를 읽어 팀 빌딩에 참고합니다.
-- `riot_loader`는 관리자 전용 운영 도구입니다.
-  - Riot API 키를 로컬에서 직접 넣고
-  - 친구들의 최근 경기 데이터를 수동/배치로 적재하고
-  - Firestore 상태를 모니터링하고 정리합니다.
-- 서버는 `Cloud Run + FastAPI + Firestore` 구조를 기준으로 동작합니다.
+- 소규모 그룹이 내전 전에 빠르게 균형 잡힌 팀을 만들 수 있게 돕기
+- 단순 티어 합산이 아니라 포지션, 최근 경기 흐름, 저장된 계정 데이터를 함께 고려하기
+- 반복적으로 함께 플레이하는 친구 그룹의 데이터를 축적해서 팀 편성 품질을 높이기
 
-## 현재 아키텍처
+## 기술 스택
 
-- 메인 앱: `PyQt5` 데스크톱 클라이언트
-- 핵심 도메인: 로컬 팀 생성 알고리즘
-- 운영 도구: `riot_loader`
-- 백엔드: `FastAPI`
-- 저장소: `Cloud Firestore`
-- 배포 대상: `GCP Cloud Run`
+### 데스크톱 클라이언트
+- `Python 3.12`
+- `PyQt5`
+- `QSS` 테마 시스템 (`dark.qss`, `light.qss`)
 
-### Firestore 컬렉션
+### 핵심 로직
+- `client/domain/team_builder.py`
+- 로컬 실행형 팀 생성 알고리즘
 
-- `app_users`
-  - 관리자/앱 사용자 계정
-- `riot_accounts`
-  - 저장된 Riot 계정 메타데이터
-- `matches`
-  - 경기 상세 원본 + 요약
-- `match_participants`
-  - 최근 경기 조회를 빠르게 하기 위한 참가자 인덱스
+### 백엔드
+- `FastAPI`
+- `PyJWT`
+- `google-cloud-firestore`
 
-## 저장소 구조
+### 인프라
+- `Google Cloud Run`
+- `Cloud Firestore`
+
+## 아키텍처
+
+### 1. Main Desktop Client
+- 사용자가 직접 실행하는 메인 앱입니다.
+- 유저 표 편집, 계정 검색, 최근 매치 확인, 팀 생성, 결과 복사를 담당합니다.
+- 실제 팀 생성 알고리즘은 이 앱 안에서 로컬로 실행됩니다.
+
+### 2. Team Builder Domain Logic
+- 프로젝트의 핵심입니다.
+- 티어, 세부 티어, 포지션, 최근 경기 폼 등을 반영해 팀 균형을 계산합니다.
+
+### 3. Cloud Run API
+- 계정 인증
+- 저장된 Riot 계정 조회
+- 최근 매치 조회
+- 경기 상세 조회
+
+이 API는 **데스크톱 앱의 보조 계층**이며, 핵심 팀 생성 자체는 로컬 앱이 담당합니다.
+
+### 4. Cloud Firestore
+- 앱 계정
+- 저장된 Riot 계정
+- 경기 원본
+- 최근 경기 조회용 참가자 인덱스
+
+### 5. Riot Data Ingestion
+- 관리자 흐름에서 Riot 데이터를 적재합니다.
+- 이 부분은 사용자용 메인 앱이 아니라 운영/관리 도구에서 수행합니다.
+
+## 실행 화면과 동작
+
+## 1. 로그인 화면
+
+로그인 창에서 사용자는:
+
+- 서버 주소 입력
+- 아이디 입력
+- 비밀번호 입력
+- 저장 세션 초기화
+
+를 수행할 수 있습니다.
+
+특징:
+- 아이디 입력칸은 기본값 대신 `아이디를 입력해주세요` 안내 문구를 보여줍니다.
+- 로컬 세션이 꼬였을 때 `저장 세션 초기화` 버튼으로 토큰과 사용자명을 정리할 수 있습니다.
+
+## 2. 메인 작업 화면
+
+메인 화면은 크게 두 영역으로 나뉩니다.
+
+### 왼쪽: 데이터셋 / 유저 표
+- 데이터셋 생성
+- 데이터셋 복사
+- 데이터셋 삭제
+- 유저 추가 / 삭제
+- 선택 체크
+- 포지션 조정
+- 커플 그룹 지정
+
+여기서 사용자는 팀 생성에 사용할 로컬 유저 목록을 직접 관리합니다.
+
+### 오른쪽: 계정 조회 / 최근 경기 / 결과
+- 계정 검색
+- 전체 유저 검색
+- 최근 매치 목록
+- 포지션 통계
+- 챔피언 통계
+- 팀 생성 결과
+
+## 3. 계정 검색과 최근 경기 확인
+
+사용자는 오른쪽 분석 패널에서:
+
+- 게임명으로 계정 검색
+- 저장된 전체 계정 목록 조회
+- 특정 계정 선택
+- 최근 경기와 요약 통계 확인
+
+을 할 수 있습니다.
+
+최근 경기 영역에서 확인 가능한 정보:
+- 경기 시각
+- 챔피언
+- 포지션
+- 승패
+- K/D/A
+- CS
+- 시야 점수
+- 챔피언 대상 피해량
+- 골드
+
+요약 영역에서 확인 가능한 정보:
+- 최근 경기 수
+- 최근 승수 / 패수
+- 최근 승률
+- 평균 KDA
+- 평균 CS
+- 포지션 통계
+- 챔피언 통계
+
+## 4. 유저를 팀 빌더 표에 반영
+
+검색한 계정을 선택한 뒤 `선택 유저 추가`를 누르면:
+
+- Riot ID
+- 티어 / 세부 티어
+- 최근 경기 수
+- 최근 승률
+- 최근 KDA
+- 선호 포지션 추정치
+
+가 현재 데이터셋 표에 반영됩니다.
+
+즉 사용자는 “검색만 하는 화면”이 아니라, **검색 결과를 팀 빌딩 입력값으로 바로 흡수**할 수 있습니다.
+
+## 5. 팀 생성
+
+팀 생성 흐름은 단순합니다.
+
+1. 사용할 유저를 표에서 선택
+2. 필요하면 포지션과 티어를 수정
+3. `팀 생성` 클릭
+4. 결과 확인
+5. `복사` 버튼으로 공유
+
+결과 화면에는:
+- 팀 A / 팀 B 구성
+- 포지션 적합도
+- 최근 폼 반영 결과
+- 경고 / 주의 메시지
+
+가 포함됩니다.
+
+## 6. 경기 상세 보기
+
+최근 경기 목록에서 특정 경기를 선택하면 `경기 상세 보기`를 열 수 있습니다.
+
+여기서는 참가자 기준으로:
+- 소환사명
+- 챔피언
+- 포지션
+- 승패
+- KDA
+- CS
+- 피해량
+- 시야 점수
+
+를 확인할 수 있습니다.
+
+## 핵심 기능 요약
+
+- 로컬 팀 생성 알고리즘
+- 데이터셋 기반 반복 사용
+- 계정 검색 및 전체 유저 검색
+- 최근 매치 기반 폼 확인
+- 경기 상세 조회
+- 팀 결과 복사
+- 로컬 세션 초기화 / 로그아웃
+
+## Firestore 컬렉션
+
+### `app_users`
+- 앱 로그인 계정 저장
+
+### `riot_accounts`
+- 저장된 Riot 계정 메타데이터
+
+### `matches`
+- 경기 원본 상세 데이터
+
+### `match_participants`
+- 최근 매치 조회용 참가자 인덱스
+
+참고:
+- 최근 매치 조회는 `matches`를 직접 읽는 것이 아니라 주로 `match_participants`를 기준으로 동작합니다.
+
+## 저장 구조와 사용자 데이터
+
+메인 앱은 로컬에도 일부 설정을 저장합니다.
+
+예:
+- 서버 주소
+- 테마
+- 저장된 로그인 세션
+
+관련 파일:
+- `client/data/config.json`
+
+## 문서 모음
+
+- 영어 README: [README_EN.md](README_EN.md)
+- 로컬 테스트 가이드: [local_test_guild.md](local_test_guild.md)
+- GCP 배포 문서: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN.md)
+- 패치 노트: [patch_notes/](patch_notes)
+- 최근 매치 조회 장애 리포트: [patch_notes/INCIDENT_REPORT_2026-05-05_MATCH_LOOKUP.md](patch_notes/INCIDENT_REPORT_2026-05-05_MATCH_LOOKUP.md)
+
+## 프로젝트 구조
 
 - [client/](client)
   - 메인 데스크톱 앱
 - [client/domain/](client/domain)
   - 핵심 팀 생성 알고리즘
-- [client/tools/](client/tools)
-  - `riot_loader` 등 운영 도구
+- [client/ui/](client/ui)
+  - 화면 구성
 - [server/](server)
-  - FastAPI 서버
+  - FastAPI 백엔드
+- [docs/images/](docs/images)
+  - README용 아키텍처 이미지
 - [deploy/gcp/](deploy/gcp)
   - GCP 배포 문서
-- [patch_notes/](patch_notes)
-  - 날짜별 패치노트
 
-## 문서 모음
+## 참고
 
-- 배포 가이드: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md)
-- 로컬 테스트 가이드: [local_test_guild.md](local_test_guild.md)
-- 최신 패치노트: [patch_notes/PATCH_NOTES_2026-05-05.md](patch_notes/PATCH_NOTES_2026-05-05.md)
-- 전체 패치노트 폴더: [patch_notes/](patch_notes)
+이 프로젝트는 **웹사이트 중심 서비스**가 아니라 **데스크톱 앱 중심 구조**입니다.
 
-## 빠른 시작
+즉 Riot API 심사 관점에서도 핵심은:
+- 사용자가 로컬 앱을 실행해 기능을 사용한다는 점
+- 서버는 계정 / 경기 데이터 제공 계층이라는 점
+- 핵심 팀 생성 알고리즘은 로컬에서 직접 실행된다는 점
 
-### 1. 가상환경 활성화
-
-```powershell
-cd C:\Users\wjddn\OneDrive\Desktop\projects\team_builder
-.\.venv\Scripts\Activate.ps1
-```
-
-PowerShell 실행 정책 때문에 막히면:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-### 2. 서버 의존성 설치
-
-```powershell
-python -m pip install -r server\requirements.txt
-```
-
-### 3. Firestore Emulator 기준 서버 실행
-
-```powershell
-$env:TEAM_BUILDER_FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
-$env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
-$env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
-$env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
-python -m uvicorn server.main:app --reload
-```
-
-배포 환경에서는 `TEAM_BUILDER_FIRESTORE_EMULATOR_HOST` 를 설정하지 않으면 됩니다.  
-그러면 같은 소스코드가 자동으로 실제 Firestore에 연결됩니다.
-
-### 4. 메인 클라이언트 실행
-
-```powershell
-python client\main.py
-```
-
-### 5. Riot Loader 실행
-
-```powershell
-python -m client.tools.riot_loader
-```
-
-더 자세한 로컬 테스트 절차는 [local_test_guild.md](local_test_guild.md) 에 정리되어 있습니다.
-
-## 배포 방향
-
-현재 프로젝트는 `Cloud Run + Firestore` 기준으로 배포하며, 컨테이너 이미지는 `Cloud Build 원격 빌드`를 기본 경로로 사용합니다. 필요하면 Dockerfile 기반 로컬 빌드도 가능합니다. 로컬/배포는 소스코드를 나누지 않고 환경변수 설정으로 분기합니다.
-
-- API 서버는 Cloud Run에 배포
-- 저장 데이터는 Firestore에 보관
-- Riot API 키는 서버에 상시 보관하지 않고, 관리자 로컬 도구에서 직접 사용 가능
-- 친구 데이터는 `riot_loader`로 적재
-
-배포 절차는 [deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN_DOCKER.md) 를 기준으로 진행하면 됩니다.
+입니다.

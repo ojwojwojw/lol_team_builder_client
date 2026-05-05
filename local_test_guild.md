@@ -113,10 +113,11 @@ $env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
 python -m uvicorn server.main:app --reload
 ```
 
-선택:
+참고:
 
-```powershell
-$env:TEAM_BUILDER_RIOT_API_KEY="여기에_라이엇_API_키"
+```text
+이제 서버는 Riot API 키를 환경변수에서 읽지 않습니다.
+Riot 관련 요청은 riot_loader 또는 관리자 요청 바디에서 api_key를 직접 전달해야 합니다.
 ```
 
 헬스체크:

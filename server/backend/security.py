@@ -12,7 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from .config import get_jwt_secret as get_env_jwt_secret
-from .queries.auth_query import get_user_by_id
+from .stores.user_store import get_user_by_id
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

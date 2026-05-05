@@ -3,16 +3,16 @@ from ..stores.match_store import (
     rebuild_participant_indexes,
     store_match_bundle,
 )
-from ..stores.riot_account_store import (
-    upsert_account,
-)
-from ..queries.riot_api_query import (
+from ..clients.riot_api_client import (
     fetch_account,
     fetch_match_detail,
     fetch_match_ids,
     fetch_ranked_entries,
     fetch_summoner_by_puuid,
     select_preferred_ranked_entry,
+)
+from ..stores.riot_account_store import (
+    upsert_account,
 )
 
 

@@ -2,15 +2,13 @@ from urllib.parse import quote
 
 import requests
 
-from ..config import get_riot_api_key
-
 
 ASIA_ROUTING_BASE_URL = "https://asia.api.riotgames.com"
 KR_PLATFORM_BASE_URL = "https://kr.api.riotgames.com"
 
 
 def riot_error_response(response: requests.Response, default_msg: str) -> dict:
-    """Riot API 에러를 서버 전역에서 쓰는 공통 dict 형태로 맞춘다."""
+    """Riot API 오류를 서버 전역에서 쓰는 공통 dict 형태로 맞춘다."""
     try:
         detail = response.json()
     except Exception:
@@ -23,11 +21,9 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
 
 
 def _resolve_api_key(api_key: str | None) -> str | None:
-    """요청 바디 키가 없으면 서버 환경변수의 Riot API 키를 대신 사용한다."""
+    """요청에서 넘겨준 Riot API 키만 사용하고, 서버 설정 fallback은 두지 않는다."""
     provided_key = (api_key or "").strip()
-    if provided_key:
-        return provided_key
-    return get_riot_api_key()
+    return provided_key or None
 
 
 def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
@@ -35,9 +31,9 @@ def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
     resolved_api_key = _resolve_api_key(api_key)
     if not resolved_api_key:
         return None, {
-            "error": "Riot API key is not configured",
+            "error": "Riot API key is required",
             "status": 0,
-            "riot_response": "Set TEAM_BUILDER_RIOT_API_KEY or pass api_key in the request.",
+            "riot_response": "Pass api_key in the request body.",
         }
 
     headers = {"X-Riot-Token": resolved_api_key}
@@ -152,7 +148,6 @@ def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
 
     info = match_data.get("info", {})
     metadata = match_data.get("metadata", {})
-    # 로더/테스트 화면에서는 전체 원본보다 작은 요약 구조가 다루기 쉽다.
     participants = []
     for participant in info.get("participants", []):
         participants.append(
@@ -176,3 +171,4 @@ def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
         "participants": participants,
         "raw_match": match_data,
     }
+

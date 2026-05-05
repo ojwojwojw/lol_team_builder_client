@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
-from ..queries.auth_query import (
+from ..stores.user_store import (
     count_users,
     create_user,
     get_user_by_username,
