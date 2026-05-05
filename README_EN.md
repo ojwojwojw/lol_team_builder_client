@@ -13,7 +13,7 @@ This project is **not a public website product**. It is a **PyQt5 desktop applic
 I built this project as someone who frequently runs custom games with friends and also acts as the group `admin`. In practice, I manage the flow of loading friend account data from the Riot API into Firestore so team generation can use more consistent player data over time.
 
 The Riot API key is **never exposed to end users** and is not part of the normal user workflow.  
-It is no longer entered through the client and is instead managed only through backend server environment variables.  
+It is managed only through backend server environment variables.  
 All Riot API requests are executed by the backend (`FastAPI`) service, and the desktop client does not communicate with the Riot API directly.
 
 For deployment, the intended operating policy is to manage the Riot API key through **server-side environment variables and GCP Secret Manager**.
@@ -153,22 +153,22 @@ Admin-side operational flow for:
 ### 1. Riot ingestion console
 ![Riot Loader Main](docs/images/riot_loader_1.png)
 
-This is the admin console used to look up a Riot ID, inspect recent matches, and write the result into Firestore.  
-It supports both one-off manual ingestion and bulk ingestion for previously stored accounts.
-The Riot API key is not entered on this screen and is managed through server environment variables.
+This is the main admin console showing the current admin session, manual ingestion tools, bulk ingestion tools for stored accounts, and the response panel in one workspace.  
+The left side supports manual Riot ID based ingestion, while the right side handles bulk storage and tier refresh for saved accounts.
+The Riot API key is not exposed on this screen and is managed through server environment variables.
 
 ### 2. Batch scheduler
 ![Batch Scheduler](docs/images/liot_loader_2.png)
 
-This screen is used to schedule repeated ingestion in small batches.  
+This screen is used to schedule repeated ingestion in small batches for selected stored accounts.  
 The admin can control recent-match count, batch size, and execution interval for longer-running refresh jobs.
 This scheduler also runs without a client-side API key field and relies on the server's configured environment variable.
 
 ### 3. Firestore monitor
 ![Firestore Admin](docs/images/liot_loader_3.png)
 
-This is an operational support screen for checking collection sizes, browsing documents, and verifying raw JSON records.  
-It is also useful for cleanup and ingestion-result validation.
+This is the Firestore monitoring screen for checking collection statistics, browsing documents, reviewing raw JSON, and using cleanup tools.  
+It is used for ingestion-result validation and operational cleanup.
 Riot API key handling is separated from this monitor and is managed only through server-side environment variables.
 
 ### 4. Main team builder workspace
