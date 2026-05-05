@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 requests
-PyQt5
 PyJWT
 google-cloud-firestore
