@@ -193,12 +193,24 @@ def get_position_priority_penalty(user, position):
     """엄격 모드에서 포지션 배정 우선순위 페널티를 계산한다."""
     positions = normalize_positions(user)
 
-    if position not in positions:
-        if ANY_POSITION not in positions:
-            return None
-        return positions.index(ANY_POSITION)
+    PRIORITY_PENALTY_MAP = {
+        0: 0,    # 1지망
+        1: 6,    # 2지망
+        2: 15,   # 3지망
+    }
 
-    return positions.index(position)
+    # 엄격 모드에서는 '상관없음'을 실제 라인 후보에서 제외한다.
+    concrete_positions = [
+        pos for pos in positions
+        if pos != ANY_POSITION
+    ]
+
+    # 명시한 실제 포지션이 아니면 엄격 모드에서는 불가능 처리
+    if position not in concrete_positions:
+        return None
+
+    index = concrete_positions.index(position)
+    return PRIORITY_PENALTY_MAP.get(index, 30)
 
 
 def get_relaxed_position_priority_penalty(user, position):
@@ -614,6 +626,7 @@ def _build_candidate(
         "t2_score": team2_score,
     }
 
+    ## 여기 우선순위에 따라 가장 먼저 띄울 조합이 달라진다.
     candidate_key = (
         candidate["warning_count"],
         candidate["position_penalty"],
