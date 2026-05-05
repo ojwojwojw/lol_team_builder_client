@@ -5,7 +5,6 @@ from pydantic import BaseModel
 class RiotAccountRequest(BaseModel):
     """Input body for puuid lookup."""
 
-    api_key: str | None = None
     game_name: str
     tag_line: str
 
@@ -13,7 +12,6 @@ class RiotAccountRequest(BaseModel):
 class MatchIdsRequest(BaseModel):
     """Input body for recent match id lookup."""
 
-    api_key: str | None = None
     puuid: str
     count: int = 5
 
@@ -21,14 +19,12 @@ class MatchIdsRequest(BaseModel):
 class MatchDetailRequest(BaseModel):
     """Input body for one match detail lookup."""
 
-    api_key: str | None = None
     match_id: str
 
 
 class StoreRecentMatchesRequest(BaseModel):
     """Input body for fetch-and-store batch flow."""
 
-    api_key: str | None = None
     game_name: str
     tag_line: str
     count: int = 5
@@ -44,7 +40,6 @@ class StoredRiotAccountRef(BaseModel):
 class StoreStoredAccountsRequest(BaseModel):
     """Input body for batch storing selected accounts already saved in riot_account."""
 
-    api_key: str | None = None
     count: int = 5
     accounts: list[StoredRiotAccountRef]
 
@@ -52,7 +47,6 @@ class StoreStoredAccountsRequest(BaseModel):
 class RefreshStoredAccountsRequest(BaseModel):
     """Input body for batch refreshing tier data for stored riot accounts."""
 
-    api_key: str | None = None
     accounts: list[StoredRiotAccountRef]
 
 

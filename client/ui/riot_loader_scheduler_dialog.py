@@ -28,17 +28,15 @@ class BatchStoreWorker(QThread):
     finished_with_result = pyqtSignal(dict)
     failed_with_error = pyqtSignal(str)
 
-    def __init__(self, api: RiotLoaderApi, api_key: str, count: int, accounts: list[dict]):
+    def __init__(self, api: RiotLoaderApi, count: int, accounts: list[dict]):
         super().__init__()
         self.api = api
-        self.api_key = api_key
         self.count = count
         self.accounts = list(accounts)
 
     def run(self):
         try:
             response, data = self.api.store_selected_accounts(
-                self.api_key,
                 self.count,
                 self.accounts,
             )
@@ -97,7 +95,8 @@ class RiotLoaderSchedulerDialog(QDialog):
         layout = QVBoxLayout(box)
 
         guide = QLabel(
-            "저장된 계정을 이 화면에서 직접 선택하고, 작은 배치로 나누어 일정 간격마다 순환 적재합니다."
+            "저장된 계정을 이 화면에서 직접 선택하고, 작은 배치로 나누어 일정 간격마다 순환 적재합니다. "
+            "Riot API 키는 서버 환경변수에서 관리됩니다."
         )
         guide.setWordWrap(True)
         layout.addWidget(guide)
@@ -142,10 +141,6 @@ class RiotLoaderSchedulerDialog(QDialog):
         layout.setSpacing(12)
 
         form = QFormLayout()
-        self.api_key_input = QLineEdit()
-        self.api_key_input.setPlaceholderText("Riot API Key 입력")
-        self.api_key_input.setEchoMode(QLineEdit.Password)
-
         self.count_input = QSpinBox()
         self.count_input.setMinimum(1)
         self.count_input.setMaximum(500)
@@ -164,7 +159,6 @@ class RiotLoaderSchedulerDialog(QDialog):
         self.interval_input.setValue(10)
         self.interval_input.setSuffix(" 분")
 
-        form.addRow("Riot API Key", self.api_key_input)
         form.addRow("최근 경기 수", self.count_input)
         form.addRow("배치 크기", self.batch_size_input)
         form.addRow("실행 간격", self.interval_input)
@@ -318,11 +312,7 @@ class RiotLoaderSchedulerDialog(QDialog):
             self._update_status("스케줄러가 이미 실행 중입니다.")
             return
 
-        api_key = self.api_key_input.text().strip()
         accounts = self._get_checked_accounts()
-        if not api_key:
-            QMessageBox.warning(self, "입력 오류", "Riot API Key를 입력해주세요.")
-            return
         if not accounts:
             QMessageBox.warning(self, "입력 오류", "대상 계정을 하나 이상 선택해주세요.")
             return
@@ -379,7 +369,6 @@ class RiotLoaderSchedulerDialog(QDialog):
 
         self.scheduler_worker = BatchStoreWorker(
             self.api,
-            self.api_key_input.text().strip(),
             self.count_input.value(),
             self.scheduler_current_batch,
         )

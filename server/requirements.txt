@@ -3,3 +3,4 @@ uvicorn
 requests
 PyJWT
 google-cloud-firestore
+python-dotenv

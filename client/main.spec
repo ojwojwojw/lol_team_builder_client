@@ -5,7 +5,7 @@ a = Analysis(
     ['client/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('client/styles/dark.qss', 'styles')],
+    datas=[('client/styles', 'styles')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -17,9 +17,9 @@ from ..stores.riot_account_store import (
 
 
 class RiotService:
-    def get_puuid(self, game_name: str, tag_line: str, api_key: str) -> dict:
+    def get_puuid(self, game_name: str, tag_line: str) -> dict:
         """Riot ID로 PUUID를 조회해 최소 식별 정보만 반환한다."""
-        result = fetch_account(game_name, tag_line, api_key)
+        result = fetch_account(game_name, tag_line)
         if "error" in result:
             return result
         return {
@@ -28,13 +28,13 @@ class RiotService:
             "puuid": result["puuid"],
         }
 
-    def get_match_ids(self, puuid: str, api_key: str, count: int) -> dict:
+    def get_match_ids(self, puuid: str, count: int) -> dict:
         """한 PUUID의 최근 경기 ID 목록을 Riot API에서 그대로 받아 반환한다."""
-        return fetch_match_ids(puuid, api_key, count)
+        return fetch_match_ids(puuid, count)
 
-    def get_match_detail(self, match_id: str, api_key: str) -> dict:
+    def get_match_detail(self, match_id: str) -> dict:
         """한 경기의 상세를 Riot API에서 읽고 화면에 필요한 필드만 추려 반환한다."""
-        result = fetch_match_detail(match_id, api_key)
+        result = fetch_match_detail(match_id)
         if "error" in result:
             return result
         return {
@@ -45,7 +45,7 @@ class RiotService:
             "participants": result["participants"],
         }
 
-    def _build_stored_account_payload(self, account_result: dict, api_key: str) -> dict:
+    def _build_stored_account_payload(self, account_result: dict) -> dict:
         """Riot 계정, 소환사, 티어 정보를 Firestore 저장 형태로 조합한다."""
         puuid = account_result["puuid"]
         payload = {
@@ -67,14 +67,14 @@ class RiotService:
             "tier_sync_warning": None,
         }
 
-        summoner_result = fetch_summoner_by_puuid(puuid, api_key)
+        summoner_result = fetch_summoner_by_puuid(puuid)
         if "error" not in summoner_result:
             payload["summoner_id"] = summoner_result.get("id")
             payload["summoner_level"] = summoner_result.get("summoner_level")
             payload["profile_icon_id"] = summoner_result.get("profile_icon_id")
             payload["raw_summoner"] = summoner_result.get("raw_summoner")
 
-        ranked_result = fetch_ranked_entries(puuid, api_key)
+        ranked_result = fetch_ranked_entries(puuid)
         if "error" in ranked_result:
             payload["tier_sync_warning"] = ranked_result
             return payload
@@ -89,17 +89,14 @@ class RiotService:
         payload["losses"] = preferred_entry.get("losses") if preferred_entry else None
         return payload
 
-    def refresh_account_tier(self, game_name: str, tag_line: str, api_key: str) -> dict:
+    def refresh_account_tier(self, game_name: str, tag_line: str) -> dict:
         """한 Riot 계정의 티어 메타데이터만 다시 읽어 Firestore에 반영한다."""
         try:
-            account_result = fetch_account(game_name, tag_line, api_key)
+            account_result = fetch_account(game_name, tag_line)
             if "error" in account_result:
                 return account_result
 
-            stored_account_payload = self._build_stored_account_payload(
-                account_result,
-                api_key,
-            )
+            stored_account_payload = self._build_stored_account_payload(account_result)
             upsert_account(stored_account_payload)
 
             return {
@@ -125,7 +122,7 @@ class RiotService:
                 "storage": "firestore",
             }
 
-    def refresh_account_tiers_for_accounts(self, accounts: list[dict], api_key: str) -> dict:
+    def refresh_account_tiers_for_accounts(self, accounts: list[dict]) -> dict:
         """선택된 여러 Riot 계정의 티어 메타데이터를 일괄 갱신한다."""
         normalized_accounts = []
         seen = set()
@@ -163,7 +160,6 @@ class RiotService:
             result = self.refresh_account_tier(
                 account["game_name"],
                 account["tag_line"],
-                api_key,
             )
             results.append(result)
 
@@ -182,23 +178,18 @@ class RiotService:
             "storage": "firestore",
         }
 
-    def store_recent_matches(
-        self, game_name: str, tag_line: str, api_key: str, count: int = 5
-    ) -> dict:
+    def store_recent_matches(self, game_name: str, tag_line: str, count: int = 5) -> dict:
         """한 Riot 계정의 최근 경기들을 읽어 Firestore에 저장한다."""
         try:
-            account_result = fetch_account(game_name, tag_line, api_key)
+            account_result = fetch_account(game_name, tag_line)
             if "error" in account_result:
                 return account_result
 
-            stored_account_payload = self._build_stored_account_payload(
-                account_result,
-                api_key,
-            )
+            stored_account_payload = self._build_stored_account_payload(account_result)
             upsert_account(stored_account_payload)
 
             puuid = account_result["puuid"]
-            match_ids_result = fetch_match_ids(puuid, api_key, count)
+            match_ids_result = fetch_match_ids(puuid, count)
             if "error" in match_ids_result:
                 return match_ids_result
 
@@ -224,7 +215,7 @@ class RiotService:
                     rebuilt_existing_match_ids.extend(rebuild_participant_indexes([match_id]))
                     continue
 
-                match_result = fetch_match_detail(match_id, api_key)
+                match_result = fetch_match_detail(match_id)
                 if "error" in match_result:
                     failed_matches.append({"match_id": match_id, "error": match_result})
                     continue
@@ -264,9 +255,7 @@ class RiotService:
                 "storage": "firestore",
             }
 
-    def store_recent_matches_for_accounts(
-        self, accounts: list[dict], api_key: str, count: int = 5
-    ) -> dict:
+    def store_recent_matches_for_accounts(self, accounts: list[dict], count: int = 5) -> dict:
         """선택된 여러 Riot 계정의 최근 경기들을 순차적으로 일괄 저장한다."""
         normalized_accounts = []
         seen = set()
@@ -307,7 +296,6 @@ class RiotService:
             result = self.store_recent_matches(
                 account["game_name"],
                 account["tag_line"],
-                api_key,
                 count,
             )
             results.append(result)

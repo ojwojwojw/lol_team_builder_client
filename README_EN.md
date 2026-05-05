@@ -12,8 +12,12 @@ This project is **not a public website product**. It is a **PyQt5 desktop applic
 
 I built this project as someone who frequently runs custom games with friends and also acts as the group `admin`. In practice, I manage the flow of loading friend account data from the Riot API into Firestore so team generation can use more consistent player data over time.
 
-The Riot API key is **not stored in source code or in the repository**. It is currently kept only in a local environment after issuance and entered only when a request actually needs it.  
-Once the Personal Key workflow is finalized, I plan to move that secret into **GCP-provided secret environment variable management** so the deployed environment can use the key more securely.
+The Riot API key is **never exposed to end users** and is not part of the normal user workflow.  
+It is no longer entered through the client and is instead managed only through backend server environment variables.  
+All Riot API requests are executed by the backend (`FastAPI`) service, and the desktop client does not communicate with the Riot API directly.
+
+For deployment, the intended operating policy is to manage the Riot API key through **server-side environment variables and GCP Secret Manager**.
+User authentication sessions are handled with **JWT-based access tokens** issued by the backend.
 
 ![Architecture Overview](docs/images/architecture-overview-en.png)
 
@@ -24,6 +28,36 @@ Once the Personal Key workflow is finalized, I plan to move that secret into **G
 - Shows recent match summaries and player trends
 - Adds searched players directly into a local team-building dataset
 - Generates balanced teams using local logic
+
+## Riot API Key Handling
+
+- The Riot API key is never exposed to end users and is not persisted in the client application.
+- It is managed through the server-side `TEAM_BUILDER_RIOT_API_KEY` environment variable, with `RIOT_API_KEY` accepted as a legacy fallback.
+- All Riot API requests are executed exclusively on the backend service.
+- The desktop client never directly communicates with the Riot API.
+- In the deployed environment, the intended secret-management model is server-side environment variables with GCP Secret Manager.
+
+For local development, the backend can auto-load these variables from a project-root `.env` file.
+
+## Policy Compliance
+
+- This application does not attempt to replicate or replace Riot's official ranking systems such as MMR or ELO.
+- Player-related data such as recent matches, win rate, and KDA are used only as reference inputs for private custom games.
+- The goal is to help small private groups organize fair teams, not to publicly rank, shame, or judge players.
+
+## Scope of the Project
+
+- This project is intended only for small private groups and is not a public-facing service.
+- It is a desktop-based utility tool for in-house matches among friends.
+
+## Data Usage and Rate Limiting
+
+- Riot API data is collected in controlled, small batches with rate-limit awareness.
+- Previously fetched data is stored and reused to reduce unnecessary repeat requests.
+
+## Disclaimer
+
+This project is not endorsed by or affiliated with Riot Games.
 
 ## Why it exists
 
@@ -98,6 +132,7 @@ Responsibilities:
 - account lookup
 - recent match lookup
 - match detail lookup
+- JWT-based access token issuance and verification
 
 ### 4. Cloud Firestore
 Persistent storage for:
@@ -120,18 +155,21 @@ Admin-side operational flow for:
 
 This is the admin console used to look up a Riot ID, inspect recent matches, and write the result into Firestore.  
 It supports both one-off manual ingestion and bulk ingestion for previously stored accounts.
+The Riot API key is not entered on this screen and is managed through server environment variables.
 
 ### 2. Batch scheduler
 ![Batch Scheduler](docs/images/liot_loader_2.png)
 
 This screen is used to schedule repeated ingestion in small batches.  
 The admin can control recent-match count, batch size, and execution interval for longer-running refresh jobs.
+This scheduler also runs without a client-side API key field and relies on the server's configured environment variable.
 
 ### 3. Firestore monitor
 ![Firestore Admin](docs/images/liot_loader_3.png)
 
 This is an operational support screen for checking collection sizes, browsing documents, and verifying raw JSON records.  
 It is also useful for cleanup and ingestion-result validation.
+Riot API key handling is separated from this monitor and is managed only through server-side environment variables.
 
 ### 4. Main team builder workspace
 ![Main Workspace](docs/images/main_1.png)
@@ -278,6 +316,7 @@ Related file:
 ## Documents
 
 - Korean README: [README.md](README.md)
+- Local environment file: project-root `.env` (gitignored)
 - Local test guide: [local_test_guild.md](local_test_guild.md)
 - GCP deployment guide: [deploy/gcp/DEPLOY_GCP_CLOUD_RUN.md](deploy/gcp/DEPLOY_GCP_CLOUD_RUN.md)
 - Incident report: [patch_notes/INCIDENT_REPORT_2026-05-05_MATCH_LOOKUP.md](patch_notes/INCIDENT_REPORT_2026-05-05_MATCH_LOOKUP.md)
@@ -291,3 +330,4 @@ For Riot review purposes:
 - the main functionality is executed locally in the client
 - Riot data is used to support player review and team balancing
 - the backend is a supporting data service, not the primary product surface
+- the app is intended only for small private groups running custom games

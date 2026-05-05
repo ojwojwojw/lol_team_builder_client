@@ -5,7 +5,7 @@ a = Analysis(
     ['client\\tools\\riot_loader.py'],
     pathex=['client'],
     binaries=[],
-    datas=[('client/styles/dark.qss', 'styles'), ('client/styles/light.qss', 'styles')],
+    datas=[('client/styles', 'styles')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -19,6 +19,7 @@
 - `TEAM_BUILDER_FIRESTORE_PROJECT`
 - `TEAM_BUILDER_FIRESTORE_DATABASE`
 - `TEAM_BUILDER_JWT_SECRET`
+- `TEAM_BUILDER_RIOT_API_KEY`
 
 로컬 에뮬레이터를 쓸 때만:
 - `TEAM_BUILDER_FIRESTORE_EMULATOR_HOST`
@@ -38,6 +39,12 @@
 - Firestore는 `(default)` / Native mode 기준
 - 서버는 Cloud Run에 배포
 - 데스크톱 앱은 별도 배포
+
+## Secret Manager 권장 방식
+
+- `TEAM_BUILDER_RIOT_API_KEY`는 Cloud Run 일반 평문 환경변수보다 `Secret Manager` 연동 방식으로 주입하는 것을 권장합니다.
+- 운영 환경에서는 Riot API 키를 코드 저장소나 클라이언트에 두지 않고, GCP에서만 관리합니다.
+- 로컬 개발에서는 `.env` 또는 셸 환경변수를 사용하고, 운영 배포에서는 같은 변수명을 Secret Manager로 연결하면 됩니다.
 
 ## 참고 문서
 

@@ -2,6 +2,8 @@ from urllib.parse import quote
 
 import requests
 
+from ..config import get_riot_api_key
+
 
 ASIA_ROUTING_BASE_URL = "https://asia.api.riotgames.com"
 KR_PLATFORM_BASE_URL = "https://kr.api.riotgames.com"
@@ -20,20 +22,22 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
     }
 
 
-def _resolve_api_key(api_key: str | None) -> str | None:
-    """요청에서 넘겨준 Riot API 키만 사용하고, 서버 설정 fallback은 두지 않는다."""
-    provided_key = (api_key or "").strip()
-    return provided_key or None
+def _resolve_api_key() -> str | None:
+    """Riot API 키는 서버 환경 변수에서만 가져온다."""
+    return get_riot_api_key()
 
 
-def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
+def fetch_riot_json(url: str, error_msg: str):
     """공통 헤더와 예외 처리를 적용해 Riot GET 요청을 한 번 수행한다."""
-    resolved_api_key = _resolve_api_key(api_key)
+    resolved_api_key = _resolve_api_key()
     if not resolved_api_key:
         return None, {
-            "error": "Riot API key is required",
+            "error": "Riot API key is not configured on the server",
             "status": 0,
-            "riot_response": "Pass api_key in the request body.",
+            "riot_response": (
+                "Set TEAM_BUILDER_RIOT_API_KEY on the server environment. "
+                "RIOT_API_KEY is also accepted as a legacy fallback."
+            ),
         }
 
     headers = {"X-Riot-Token": resolved_api_key}
@@ -50,13 +54,13 @@ def fetch_riot_json(url: str, api_key: str | None, error_msg: str):
     return response.json(), None
 
 
-def fetch_account(game_name: str, tag_line: str, api_key: str | None) -> dict:
+def fetch_account(game_name: str, tag_line: str) -> dict:
     """Riot ID로 계정 기본 정보와 PUUID를 조회한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/riot/account/v1/accounts/by-riot-id/"
         f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
     )
-    account, error = fetch_riot_json(url, api_key, "Failed to get account by Riot ID")
+    account, error = fetch_riot_json(url, "Failed to get account by Riot ID")
     if error:
         return error
     return {
@@ -67,13 +71,13 @@ def fetch_account(game_name: str, tag_line: str, api_key: str | None) -> dict:
     }
 
 
-def fetch_summoner_by_puuid(puuid: str, api_key: str | None) -> dict:
+def fetch_summoner_by_puuid(puuid: str) -> dict:
     """티어 조회에 필요한 소환사 정보 payload를 PUUID 기준으로 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/summoner/v4/summoners/by-puuid/"
         f"{quote(puuid, safe='')}"
     )
-    summoner, error = fetch_riot_json(url, api_key, "Failed to get summoner by puuid")
+    summoner, error = fetch_riot_json(url, "Failed to get summoner by puuid")
     if error:
         return error
 
@@ -88,13 +92,13 @@ def fetch_summoner_by_puuid(puuid: str, api_key: str | None) -> dict:
     }
 
 
-def fetch_ranked_entries(puuid: str, api_key: str | None) -> dict:
+def fetch_ranked_entries(puuid: str) -> dict:
     """한 계정의 랭크 큐 엔트리 목록을 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/league/v4/entries/by-puuid/"
         f"{quote(puuid, safe='')}"
     )
-    entries, error = fetch_riot_json(url, api_key, "Failed to get ranked entries")
+    entries, error = fetch_riot_json(url, "Failed to get ranked entries")
     if error:
         return error
 
@@ -124,25 +128,25 @@ def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
     return sorted_entries[0]
 
 
-def fetch_match_ids(puuid: str, api_key: str | None, count: int = 5) -> dict:
+def fetch_match_ids(puuid: str, count: int = 5) -> dict:
     """한 PUUID의 최근 경기 ID 목록을 가져온다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/by-puuid/"
         f"{quote(puuid, safe='')}/ids?start=0&count={count}"
     )
-    match_ids, error = fetch_riot_json(url, api_key, "Failed to get match IDs")
+    match_ids, error = fetch_riot_json(url, "Failed to get match IDs")
     if error:
         return error
     return {"puuid": puuid, "match_ids": match_ids, "count": count}
 
 
-def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
+def fetch_match_detail(match_id: str) -> dict:
     """경기 상세 원본을 읽고 서비스가 바로 쓰기 쉬운 요약 구조로 정리한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/"
         f"{quote(match_id, safe='')}"
     )
-    match_data, error = fetch_riot_json(url, api_key, "Failed to get match detail")
+    match_data, error = fetch_riot_json(url, "Failed to get match detail")
     if error:
         return error
 
@@ -171,4 +175,3 @@ def fetch_match_detail(match_id: str, api_key: str | None) -> dict:
         "participants": participants,
         "raw_match": match_data,
     }
-

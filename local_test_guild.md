@@ -110,14 +110,18 @@ $env:TEAM_BUILDER_FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
 $env:TEAM_BUILDER_FIRESTORE_PROJECT="demo-team-builder-local"
 $env:TEAM_BUILDER_FIRESTORE_DATABASE="(default)"
 $env:TEAM_BUILDER_JWT_SECRET="local-dev-secret"
+$env:TEAM_BUILDER_RIOT_API_KEY="RGAPI-REPLACE-WITH-YOUR-DEV-KEY"
 python -m uvicorn server.main:app --reload
 ```
+
+또는 프로젝트 루트의 `.env` 파일에 같은 값을 넣어둘 수 있습니다.  
+서버는 시작 시 `.env`를 자동으로 읽습니다.
 
 참고:
 
 ```text
-이제 서버는 Riot API 키를 환경변수에서 읽지 않습니다.
-Riot 관련 요청은 riot_loader 또는 관리자 요청 바디에서 api_key를 직접 전달해야 합니다.
+이제 서버는 Riot API 키를 요청 바디로 받지 않습니다.
+Riot 관련 요청은 서버 환경변수 `TEAM_BUILDER_RIOT_API_KEY`를 통해서만 처리합니다.
 ```
 
 헬스체크:
