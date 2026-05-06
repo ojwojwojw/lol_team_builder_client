@@ -28,11 +28,6 @@ class RiotLoaderApi:
         self.refresh_selected_tiers_url = (
             f"{self.api_base_url}/refresh_account_tier/by-stored-accounts"
         )
-        self.firestore_stats_url = f"{self.api_base_url}/admin/firestore/stats"
-        self.firestore_collection_url = f"{self.api_base_url}/admin/firestore/collections"
-        self.firestore_delete_documents_url = f"{self.api_base_url}/admin/firestore/delete-documents"
-        self.firestore_clear_collection_url = f"{self.api_base_url}/admin/firestore/clear-collection"
-        self.firestore_delete_older_than_url = f"{self.api_base_url}/admin/firestore/delete-older-than"
 
     def auth_headers(self):
         token = team_app.load_auth_token().strip()
@@ -123,51 +118,4 @@ class RiotLoaderApi:
             self.refresh_selected_tiers_url,
             payload=payload,
             timeout=300,
-        )
-
-    def get_firestore_stats(self):
-        return self.request("GET", self.firestore_stats_url, timeout=60)
-
-    def list_firestore_documents(self, collection: str, limit: int):
-        url = f"{self.firestore_collection_url}/{collection}/documents?{urlencode({'limit': limit})}"
-        return self.request("GET", url, timeout=60)
-
-    def get_firestore_document(self, collection: str, document_id: str):
-        url = f"{self.firestore_collection_url}/{collection}/documents/{document_id}"
-        return self.request("GET", url, timeout=60)
-
-    def delete_firestore_documents(self, collection: str, document_ids: list[str]):
-        payload = {
-            "collection": collection,
-            "document_ids": document_ids,
-        }
-        return self.request(
-            "POST",
-            self.firestore_delete_documents_url,
-            payload=payload,
-            timeout=60,
-        )
-
-    def clear_firestore_collection(self, collection: str):
-        payload = {
-            "collection": collection,
-            "document_ids": [],
-        }
-        return self.request(
-            "POST",
-            self.firestore_clear_collection_url,
-            payload=payload,
-            timeout=120,
-        )
-
-    def delete_firestore_older_than(self, collection: str, days: int):
-        payload = {
-            "collection": collection,
-            "days": days,
-        }
-        return self.request(
-            "POST",
-            self.firestore_delete_older_than_url,
-            payload=payload,
-            timeout=120,
         )

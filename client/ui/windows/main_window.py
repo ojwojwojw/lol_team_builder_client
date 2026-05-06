@@ -37,15 +37,15 @@ from application.recent_match_views import (
 )
 from application.team_app import team_app
 from domain.constants import ACCOUNT_SEARCH_LIMIT, ANY_POSITION
-from ui.config_dialog import ConfigDialog
-from ui.auth_admin_dialog import AuthAdminDialog
-from ui.couple_group_dialog import CoupleGroupDialog
-from ui.login_dialog import LoginDialog
-from ui.match_detail_dialog import MatchDetailDialog
-from ui.style_loader import load_style
-from ui.team_result_widget import TeamResultWidget
-from ui.theme import get_recent_summary_style
-from ui.user_table_widget import UserTableWidget
+from ui.dialogs.auth_admin_dialog import AuthAdminDialog
+from ui.dialogs.config_dialog import ConfigDialog
+from ui.dialogs.couple_group_dialog import CoupleGroupDialog
+from ui.dialogs.login_dialog import LoginDialog
+from ui.dialogs.match_detail_dialog import MatchDetailDialog
+from ui.styling.style_loader import load_style
+from ui.styling.theme import get_recent_summary_style
+from ui.widgets.team_result_widget import TeamResultWidget
+from ui.widgets.user_table_widget import UserTableWidget
 
 
 class MainWindow(QWidget):
@@ -73,7 +73,7 @@ class MainWindow(QWidget):
         self.load_dataset_list()
 
     def _log_exception(self, title, exc):
-        log_path = Path(__file__).resolve().parent.parent / "team_builder_client_error.log"
+        log_path = Path(__file__).resolve().parents[2] / "team_builder_client_error.log"
         message = f"{title}\n{traceback.format_exc()}\n"
         try:
             with open(log_path, "a", encoding="utf-8") as file:

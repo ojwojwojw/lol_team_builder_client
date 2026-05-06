@@ -1,5 +1,4 @@
 from .firestore_client import get_client, utcnow_iso
-from .local_cache_store import get_cache_stats
 from .firestore_admin_store import (
     clear_collection,
     delete_documents_by_ids,
@@ -36,7 +35,6 @@ __all__ = [
     "clear_collection",
     "delete_documents_by_ids",
     "delete_older_than_days",
-    "get_cache_stats",
     "get_account_by_riot_id",
     "get_accounts_by_game_name",
     "get_client",

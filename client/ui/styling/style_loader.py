@@ -4,7 +4,7 @@ import sys
 from domain.constants import normalize_theme_mode
 
 
-CLIENT_ROOT = Path(__file__).resolve().parents[1]
+CLIENT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def resource_path(relative_path):

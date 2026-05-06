@@ -3,13 +3,6 @@ from __future__ import annotations
 from google.cloud import firestore
 
 from .firestore_client import get_client, utcnow_iso
-from .local_cache_store import (
-    CACHE_MISS,
-    MATCH_NAMESPACE,
-    load_cached_json,
-    save_cached_json,
-    touch_cache_namespace,
-)
 
 
 def _match_collection():
@@ -72,7 +65,6 @@ def store_match_bundle(match_id: str, match_data: dict) -> None:
         doc_id = f"{match_id}_{participant.get('puuid', '')}"
         batch.set(_participant_index_collection().document(doc_id), participant_payload)
     batch.commit()
-    touch_cache_namespace(MATCH_NAMESPACE)
 
 
 def rebuild_participant_indexes(match_ids: list[str]) -> list[str]:
@@ -113,17 +105,11 @@ def rebuild_participant_indexes(match_ids: list[str]) -> list[str]:
         batch.commit()
         rebuilt_match_ids.append(match_id)
 
-    if rebuilt_match_ids:
-        touch_cache_namespace(MATCH_NAMESPACE)
     return rebuilt_match_ids
 
 
 def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
     normalized_puuid = puuid.strip()
-    cache_key = f"matches:recent:puuid:{normalized_puuid}:{int(limit)}"
-    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
-    if cached is not CACHE_MISS:
-        return cached
 
     docs = _participant_index_collection().where("puuid", "==", normalized_puuid).stream()
     matches = [_with_id(snapshot) for snapshot in docs]
@@ -131,20 +117,12 @@ def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
         key=lambda match: int(match.get("game_start_timestamp") or 0),
         reverse=True,
     )
-    result = matches[:limit]
-    save_cached_json(cache_key, result, MATCH_NAMESPACE)
-    return result
+    return matches[:limit]
 
 
 def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> list[dict]:
     normalized_game_name = game_name.strip()
     normalized_tag_line = tag_line.strip()
-    cache_key = (
-        f"matches:recent:riot_id:{normalized_game_name}:{normalized_tag_line}:{int(limit)}"
-    )
-    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
-    if cached is not CACHE_MISS:
-        return cached
 
     docs = (
         _participant_index_collection()
@@ -157,21 +135,14 @@ def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> 
         key=lambda match: int(match.get("game_start_timestamp") or 0),
         reverse=True,
     )
-    result = matches[:limit]
-    save_cached_json(cache_key, result, MATCH_NAMESPACE)
-    return result
+    return matches[:limit]
 
 
 def get_match_detail(match_id: str) -> dict | None:
     normalized_match_id = match_id.strip()
-    cache_key = f"matches:detail:{normalized_match_id}"
-    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
-    if cached is not CACHE_MISS:
-        return cached
 
     snapshot = _match_collection().document(normalized_match_id).get()
     if not snapshot.exists:
-        save_cached_json(cache_key, None, MATCH_NAMESPACE)
         return None
 
     data = snapshot.to_dict() or {}
@@ -203,7 +174,6 @@ def get_match_detail(match_id: str) -> dict | None:
         "teams": teams,
         "participants": participants,
     }
-    save_cached_json(cache_key, detail, MATCH_NAMESPACE)
     return detail
 
 

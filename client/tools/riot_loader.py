@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
     QFormLayout,
@@ -18,19 +20,17 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from application.team_app import team_app
+from repositories.local_api_cache_repository import LocalApiCacheRepository
 from tools.riot_loader_api import RiotLoaderApi
-from ui.firestore_admin_dialog import FirestoreAdminDialog
-from ui.login_dialog import LoginDialog
-from ui.riot_loader_scheduler_dialog import RiotLoaderSchedulerDialog
-from ui.style_loader import load_style
+from ui.dialogs.login_dialog import LoginDialog
+from ui.dialogs.riot_loader_scheduler_dialog import RiotLoaderSchedulerDialog
+from ui.styling.style_loader import load_style
 
 
 class RiotLoaderWidget(QWidget):
@@ -41,9 +41,8 @@ class RiotLoaderWidget(QWidget):
         self.current_match_ids = []
         self.api = RiotLoaderApi()
         self.scheduler_dialog = None
-        self.firestore_admin_dialog = None
 
-        self.setWindowTitle("Riot 적재 도구")
+        self.setWindowTitle("Riot Loader")
         self.setMinimumSize(980, 760)
         self._create_ui()
         self._update_session_badge()
@@ -68,18 +67,18 @@ class RiotLoaderWidget(QWidget):
         root.addWidget(self._build_result_group(), 1)
 
     def _build_header_group(self):
-        box = QGroupBox("관리자 세션")
+        box = QGroupBox("Admin Session")
         layout = QVBoxLayout(box)
         layout.setSpacing(10)
 
-        title = QLabel("Riot 전적 적재 콘솔")
+        title = QLabel("Riot Data Loader Console")
         title_font = QFont()
         title_font.setPointSize(15)
         title_font.setBold(True)
         title.setFont(title_font)
 
         subtitle = QLabel(
-            "수동 적재와 저장 계정 적재를 이 화면에서 수행하고, 배치 스케줄러는 별도 팝업에서 관리합니다."
+            "Run manual loads, batch sync jobs, and cache checks from one place."
         )
         subtitle.setWordWrap(True)
 
@@ -91,14 +90,11 @@ class RiotLoaderWidget(QWidget):
         info_row.addWidget(self.session_label, 1)
 
         button_row = QHBoxLayout()
-        self.scheduler_btn = QPushButton("배치 스케줄러 열기")
+        self.scheduler_btn = QPushButton("Batch Scheduler")
         self.scheduler_btn.clicked.connect(self.open_scheduler_dialog)
-        self.firestore_btn = QPushButton("Firestore 관리")
-        self.firestore_btn.clicked.connect(self.open_firestore_dialog)
-        self.logout_btn = QPushButton("로그아웃")
+        self.logout_btn = QPushButton("Logout")
         self.logout_btn.clicked.connect(self.logout)
         button_row.addWidget(self.scheduler_btn)
-        button_row.addWidget(self.firestore_btn)
         button_row.addStretch(1)
         button_row.addWidget(self.logout_btn)
 
@@ -109,41 +105,41 @@ class RiotLoaderWidget(QWidget):
         return box
 
     def _build_manual_group(self):
-        box = QGroupBox("수동 적재")
+        box = QGroupBox("Manual Load")
         layout = QVBoxLayout(box)
         layout.setSpacing(10)
 
         helper = QLabel(
-            "하나의 Riot ID를 조회하고 최근 경기 데이터를 확인한 뒤 DB에 적재합니다. "
-            "Riot API 키는 클라이언트가 아닌 서버 환경변수에서 관리됩니다."
+            "Look up a Riot ID, inspect recent match data, and store the latest matches "
+            "into Firestore."
         )
         helper.setWordWrap(True)
         layout.addWidget(helper)
 
         form = QFormLayout()
         self.game_name_input = QLineEdit()
-        self.game_name_input.setPlaceholderText("예: Hide on bush")
+        self.game_name_input.setPlaceholderText("Hide on bush")
         self.tag_line_input = QLineEdit()
-        self.tag_line_input.setPlaceholderText("예: KR1")
+        self.tag_line_input.setPlaceholderText("KR1")
         self.count_input = QSpinBox()
         self.count_input.setMinimum(1)
         self.count_input.setMaximum(500)
         self.count_input.setValue(5)
-        self.count_input.setSuffix(" 경기")
+        self.count_input.setSuffix(" matches")
 
-        form.addRow("게임 닉네임", self.game_name_input)
-        form.addRow("태그", self.tag_line_input)
-        form.addRow("최근 경기 수", self.count_input)
+        form.addRow("Game Name", self.game_name_input)
+        form.addRow("Tag Line", self.tag_line_input)
+        form.addRow("Recent Matches", self.count_input)
         layout.addLayout(form)
 
         button_grid = QGridLayout()
-        self.load_btn = QPushButton("1. PUUID 조회")
+        self.load_btn = QPushButton("1. Fetch PUUID")
         self.load_btn.clicked.connect(self.fetch_puuid)
-        self.match_btn = QPushButton("2. 매치 ID 조회")
+        self.match_btn = QPushButton("2. Fetch Match IDs")
         self.match_btn.clicked.connect(self.fetch_match_ids)
-        self.detail_btn = QPushButton("3. 첫 경기 상세 조회")
+        self.detail_btn = QPushButton("3. Fetch First Match Detail")
         self.detail_btn.clicked.connect(self.fetch_match_detail)
-        self.store_btn = QPushButton("4. 최근 경기 DB 적재")
+        self.store_btn = QPushButton("4. Store Recent Matches")
         self.store_btn.clicked.connect(self.store_recent_matches)
 
         button_grid.addWidget(self.load_btn, 0, 0)
@@ -155,23 +151,24 @@ class RiotLoaderWidget(QWidget):
         return box
 
     def _build_account_group(self):
-        box = QGroupBox("저장된 계정 일괄 적재")
+        box = QGroupBox("Stored Accounts")
         layout = QVBoxLayout(box)
         layout.setSpacing(10)
 
         helper = QLabel(
-            "저장된 Riot ID를 검색하고 선택한 계정들에 대해 최근 경기 적재 또는 티어 갱신을 실행합니다."
+            "Search stored Riot IDs and bulk refresh tiers or store recent matches for "
+            "selected accounts."
         )
         helper.setWordWrap(True)
         layout.addWidget(helper)
 
         search_row = QHBoxLayout()
         self.account_keyword_input = QLineEdit()
-        self.account_keyword_input.setPlaceholderText("저장된 게임 닉네임으로 검색")
+        self.account_keyword_input.setPlaceholderText("Search by stored game name")
         self.account_keyword_input.returnPressed.connect(self.search_stored_accounts)
-        self.account_list_all_btn = QPushButton("전체 불러오기")
+        self.account_list_all_btn = QPushButton("Load All")
         self.account_list_all_btn.clicked.connect(self.load_all_stored_accounts)
-        self.account_search_btn = QPushButton("검색")
+        self.account_search_btn = QPushButton("Search")
         self.account_search_btn.clicked.connect(self.search_stored_accounts)
         search_row.addWidget(self.account_keyword_input, 1)
         search_row.addWidget(self.account_list_all_btn)
@@ -179,9 +176,9 @@ class RiotLoaderWidget(QWidget):
         layout.addLayout(search_row)
 
         selection_row = QHBoxLayout()
-        self.select_all_btn = QPushButton("전체 선택")
+        self.select_all_btn = QPushButton("Select All")
         self.select_all_btn.clicked.connect(self.check_all_accounts)
-        self.clear_selection_btn = QPushButton("선택 해제")
+        self.clear_selection_btn = QPushButton("Clear Selection")
         self.clear_selection_btn.clicked.connect(self.uncheck_all_accounts)
         selection_row.addWidget(self.select_all_btn)
         selection_row.addWidget(self.clear_selection_btn)
@@ -193,9 +190,9 @@ class RiotLoaderWidget(QWidget):
         layout.addWidget(self.account_list, 1)
 
         action_row = QGridLayout()
-        self.store_selected_btn = QPushButton("선택 계정 적재")
+        self.store_selected_btn = QPushButton("Store Selected Matches")
         self.store_selected_btn.clicked.connect(self.store_selected_accounts)
-        self.refresh_tier_btn = QPushButton("선택 계정 티어 갱신")
+        self.refresh_tier_btn = QPushButton("Refresh Selected Tiers")
         self.refresh_tier_btn.clicked.connect(self.refresh_selected_account_tiers)
         action_row.addWidget(self.store_selected_btn, 0, 0)
         action_row.addWidget(self.refresh_tier_btn, 0, 1)
@@ -203,10 +200,10 @@ class RiotLoaderWidget(QWidget):
         return box
 
     def _build_result_group(self):
-        box = QGroupBox("응답 결과")
+        box = QGroupBox("Response")
         layout = QVBoxLayout(box)
 
-        self.status_label = QLabel("준비 완료")
+        self.status_label = QLabel("Ready")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
@@ -217,24 +214,24 @@ class RiotLoaderWidget(QWidget):
 
     def _update_session_badge(self):
         username = self.current_user.get("username") or "unknown"
-        role = "관리자" if self.current_user.get("is_admin") else "일반 사용자"
-        self.session_label.setText(f"로그인 사용자: {username} ({role})")
+        role = "admin" if self.current_user.get("is_admin") else "user"
+        self.session_label.setText(f"Signed in: {username} ({role})")
 
     def _update_server_label(self):
         self.api.refresh_urls()
-        self.server_url_label.setText(f"서버 주소: {self.api.api_base_url}")
+        self.server_url_label.setText(f"Server: {self.api.api_base_url}")
 
     def _show_response(self, response, data):
         text = self.api.format_response_text(response, data)
         self.result_box.setText(text)
         if response.status_code == 401:
-            self.status_label.setText("인증이 만료되었습니다. 다시 로그인해주세요.")
+            self.status_label.setText("Authentication expired. Please sign in again.")
         elif response.status_code == 403:
-            self.status_label.setText("이 작업은 관리자 권한이 필요합니다.")
+            self.status_label.setText("Admin permission is required for this action.")
         elif response.ok:
-            self.status_label.setText(f"요청 완료: HTTP {response.status_code}")
+            self.status_label.setText(f"Request completed: HTTP {response.status_code}")
         else:
-            self.status_label.setText(f"요청 실패: HTTP {response.status_code}")
+            self.status_label.setText(f"Request failed: HTTP {response.status_code}")
 
     def _set_message(self, message):
         self.status_label.setText(message)
@@ -246,10 +243,10 @@ class RiotLoaderWidget(QWidget):
         tag_line = self.tag_line_input.text().strip()
 
         if not game_name:
-            self._set_message("게임 닉네임을 먼저 입력해주세요.")
+            self._set_message("Enter a game name first.")
             return
         if not tag_line:
-            self._set_message("태그를 먼저 입력해주세요.")
+            self._set_message("Enter a tag line first.")
             return
 
         try:
@@ -262,14 +259,14 @@ class RiotLoaderWidget(QWidget):
                 self.current_puuid = ""
                 self.current_match_ids = []
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def fetch_match_ids(self):
         self._update_server_label()
         count = self.count_input.value()
 
         if not self.current_puuid:
-            self._set_message("먼저 PUUID를 조회해주세요.")
+            self._set_message("Fetch a PUUID first.")
             return
 
         try:
@@ -280,19 +277,19 @@ class RiotLoaderWidget(QWidget):
             else:
                 self.current_match_ids = []
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def fetch_match_detail(self):
         self._update_server_label()
         if not self.current_match_ids:
-            self._set_message("먼저 매치 ID를 조회해주세요.")
+            self._set_message("Fetch match IDs first.")
             return
 
         try:
             response, data = self.api.fetch_match_detail(self.current_match_ids[0])
             self._show_response(response, data)
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def store_recent_matches(self):
         self._update_server_label()
@@ -301,39 +298,40 @@ class RiotLoaderWidget(QWidget):
         count = self.count_input.value()
 
         if not game_name:
-            self._set_message("게임 닉네임을 먼저 입력해주세요.")
+            self._set_message("Enter a game name first.")
             return
         if not tag_line:
-            self._set_message("태그를 먼저 입력해주세요.")
+            self._set_message("Enter a tag line first.")
             return
+
         try:
             response, data = self.api.store_recent_matches(game_name, tag_line, count)
             self._show_response(response, data)
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def search_stored_accounts(self):
         self._update_server_label()
         keyword = self.account_keyword_input.text().strip()
         if not keyword:
-            self._set_message("저장된 계정을 검색할 키워드를 입력해주세요.")
+            self._set_message("Enter a keyword to search stored accounts.")
             return
 
         try:
             response, data = self.api.search_accounts(keyword)
             self._show_response(response, data)
-            self._populate_account_list(response, data, "검색된 저장 계정이 없습니다.")
+            self._populate_account_list(response, data, "No stored accounts matched.")
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def load_all_stored_accounts(self):
         self._update_server_label()
         try:
             response, data = self.api.list_accounts()
             self._show_response(response, data)
-            self._populate_account_list(response, data, "저장된 계정이 없습니다.")
+            self._populate_account_list(response, data, "No stored accounts found.")
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def _populate_account_list(self, response, data, empty_message):
         self.account_list.clear()
@@ -343,7 +341,7 @@ class RiotLoaderWidget(QWidget):
         for account in data.get("accounts", []):
             label = (
                 f"{account.get('game_name', '')}#{account.get('tag_line', '')}"
-                f"  |  조회 시각: {account.get('fetched_at', '-')}"
+                f" | fetched at: {account.get('fetched_at', '-')}"
             )
             item = QListWidgetItem(label)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
@@ -358,17 +356,17 @@ class RiotLoaderWidget(QWidget):
         account = item.data(Qt.UserRole) or {}
         self.game_name_input.setText(account.get("game_name", ""))
         self.tag_line_input.setText(account.get("tag_line", ""))
-        self.status_label.setText("선택한 Riot ID를 수동 적재 입력칸에 채웠습니다.")
+        self.status_label.setText("Selected Riot ID copied into the manual load fields.")
 
     def check_all_accounts(self):
         for index in range(self.account_list.count()):
             self.account_list.item(index).setCheckState(Qt.Checked)
-        self.status_label.setText("목록의 모든 계정을 선택했습니다.")
+        self.status_label.setText("All listed accounts selected.")
 
     def uncheck_all_accounts(self):
         for index in range(self.account_list.count()):
             self.account_list.item(index).setCheckState(Qt.Unchecked)
-        self.status_label.setText("계정 선택을 모두 해제했습니다.")
+        self.status_label.setText("Selection cleared.")
 
     def _get_checked_accounts(self):
         accounts = []
@@ -397,21 +395,21 @@ class RiotLoaderWidget(QWidget):
         accounts = self._get_checked_accounts()
 
         if not accounts:
-            self._set_message("적재할 저장 계정을 하나 이상 선택해주세요.")
+            self._set_message("Select at least one account to store matches.")
             return
 
         try:
             response, data = self.api.store_selected_accounts(count, accounts)
             self._show_response(response, data)
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def refresh_selected_account_tiers(self):
         self._update_server_label()
         accounts = self._get_checked_accounts()
 
         if not accounts:
-            self._set_message("티어를 갱신할 저장 계정을 하나 이상 선택해주세요.")
+            self._set_message("Select at least one account to refresh tiers.")
             return
 
         try:
@@ -420,7 +418,7 @@ class RiotLoaderWidget(QWidget):
             if response.status_code == 200:
                 self.load_all_stored_accounts()
         except Exception as exc:
-            self._set_message(f"요청 오류: {exc}")
+            self._set_message(f"Request error: {exc}")
 
     def open_scheduler_dialog(self):
         if self.scheduler_dialog is None:
@@ -430,28 +428,16 @@ class RiotLoaderWidget(QWidget):
         self.scheduler_dialog.raise_()
         self.scheduler_dialog.activateWindow()
 
-    def open_firestore_dialog(self):
-        if self.firestore_admin_dialog is None:
-            self.firestore_admin_dialog = FirestoreAdminDialog(self)
-        self.firestore_admin_dialog.show()
-        self.firestore_admin_dialog.raise_()
-        self.firestore_admin_dialog.activateWindow()
-
     def _close_aux_dialogs(self):
-        """로그아웃이나 세션 전환 전에 보조 팝업을 닫아 이전 세션 상태가 남지 않게 한다."""
         if self.scheduler_dialog is not None:
             self.scheduler_dialog.close()
             self.scheduler_dialog = None
-        if self.firestore_admin_dialog is not None:
-            self.firestore_admin_dialog.close()
-            self.firestore_admin_dialog = None
 
     def logout(self):
-        """현재 관리자 세션을 종료하고 다시 로그인할지 선택하게 한다."""
         answer = QMessageBox.question(
             self,
-            "로그아웃 확인",
-            "현재 관리자 세션을 종료하고 다시 로그인하시겠습니까?",
+            "Confirm Logout",
+            "End the current admin session and sign in again?",
         )
         if answer != QMessageBox.Yes:
             return
@@ -463,7 +449,7 @@ class RiotLoaderWidget(QWidget):
         self.current_puuid = ""
         self.current_match_ids = []
         self._update_session_badge()
-        self._set_message("관리자 세션에서 로그아웃했습니다.")
+        self._set_message("Signed out of the admin session.")
 
         current_user = ensure_admin_session(self)
         if not current_user:
@@ -473,7 +459,8 @@ class RiotLoaderWidget(QWidget):
         self.current_user = current_user
         self._update_server_label()
         self._update_session_badge()
-        self._set_message("새 관리자 세션으로 다시 로그인했습니다.")
+        self._set_message("Signed in again with a new admin session.")
+
 
 def ensure_admin_session(parent=None):
     existing_token = team_app.load_auth_token().strip()
@@ -488,20 +475,20 @@ def ensure_admin_session(parent=None):
             team_app.clear_auth_token()
             team_app.save_auth_username("")
             session_notice = (
-                "저장된 세션은 남아 있었지만 현재 서버에서는 관리자 권한을 확인할 수 없어 "
-                "로컬 세션을 초기화했습니다. 다시 로그인해주세요."
+                "The saved session is still present but the current server no longer "
+                "accepts it as an admin session. Please sign in again."
             )
             QMessageBox.warning(
                 parent,
-                "관리자 권한 필요",
-                "이 도구는 관리자 계정만 사용할 수 있습니다.",
+                "Admin Permission Required",
+                "This tool can only be used with an admin account.",
             )
         except Exception:
             team_app.clear_auth_token()
             team_app.save_auth_username("")
             session_notice = (
-                "저장된 로그인 세션이 만료되었거나 현재 서버/Firestore에 해당 사용자가 없습니다. "
-                "로컬 세션을 초기화했으니 다시 로그인해주세요."
+                "The saved session expired or is no longer valid on the current server. "
+                "Please sign in again."
             )
 
     if session_notice:
@@ -519,14 +506,15 @@ def ensure_admin_session(parent=None):
         team_app.save_auth_username("")
         QMessageBox.warning(
             parent,
-            "관리자 권한 필요",
-            "이 도구는 관리자 계정만 사용할 수 있습니다. 관리자 계정으로 로그인해주세요.",
+            "Admin Permission Required",
+            "This tool can only be used with an admin account. Please sign in again.",
         )
         login_dialog.password_input.clear()
 
 
 def main():
     app = QApplication(sys.argv)
+    LocalApiCacheRepository.ensure_ready()
     load_style(app, team_app.load_theme_mode())
 
     current_user = ensure_admin_session()

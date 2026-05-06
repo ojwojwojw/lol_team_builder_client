@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
-
 def get_jwt_secret() -> str | None:
     secret = os.getenv("TEAM_BUILDER_JWT_SECRET", "").strip()
     return secret or None
@@ -44,12 +41,3 @@ def get_allowed_origins() -> list[str]:
         return []
 
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
-
-
-def get_local_cache_db_path() -> str:
-    raw_path = os.getenv("TEAM_BUILDER_LOCAL_CACHE_DB_PATH", "").strip()
-    if raw_path:
-        return raw_path
-
-    project_root = Path(__file__).resolve().parents[2]
-    return str(project_root / "server" / "data" / "team_builder_cache.sqlite3")

@@ -21,7 +21,7 @@ from domain.constants import (
     normalize_position_name,
     normalize_tier_name,
 )
-from ui.theme import TIER_COLOR, get_theme_tokens
+from ui.styling.theme import TIER_COLOR, get_theme_tokens
 
 
 VISIBLE_USER_KEYS = {"selected", "name", "tier", "tier_detail", "positions"}
@@ -52,7 +52,7 @@ class UserTableWidget(QWidget):
         self.apply_theme(self.theme_mode)
 
     def _log_debug(self, message):
-        log_path = Path(__file__).resolve().parent.parent / "team_builder_client_error.log"
+        log_path = Path(__file__).resolve().parents[2] / "team_builder_client_error.log"
         try:
             with open(log_path, "a", encoding="utf-8") as file:
                 file.write(f"[UserTableWidget] {message}\n")
@@ -60,7 +60,7 @@ class UserTableWidget(QWidget):
             pass
 
     def _log_exception(self, title, exc):
-        log_path = Path(__file__).resolve().parent.parent / "team_builder_client_error.log"
+        log_path = Path(__file__).resolve().parents[2] / "team_builder_client_error.log"
         try:
             with open(log_path, "a", encoding="utf-8") as file:
                 file.write(f"[UserTableWidget] {title}: {exc}\n")

@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
 
 from domain.constants import DEFAULT_THEME_MODE, POSITIONS
 from domain.team_builder import calc_position_fit_bonus, calc_recent_form_bonus
-from ui.score_breakdown_dialog import ScoreBreakdownDialog
-from ui.theme import TIER_COLOR, get_theme_tokens
+from ui.dialogs.score_breakdown_dialog import ScoreBreakdownDialog
+from ui.styling.theme import TIER_COLOR, get_theme_tokens
 
 
 class TeamResultWidget(QWidget):

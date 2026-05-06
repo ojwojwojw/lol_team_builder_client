@@ -5,9 +5,10 @@ from pathlib import Path
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 from application.team_app import team_app
-from ui.login_dialog import LoginDialog
-from ui.main_window import MainWindow
-from ui.style_loader import load_style
+from repositories.local_api_cache_repository import LocalApiCacheRepository
+from ui.dialogs.login_dialog import LoginDialog
+from ui.styling.style_loader import load_style
+from ui.windows.main_window import MainWindow
 
 
 def log_unhandled_exception(exc_type, exc_value, exc_traceback):
@@ -26,6 +27,7 @@ def log_unhandled_exception(exc_type, exc_value, exc_traceback):
 if __name__ == "__main__":
     sys.excepthook = log_unhandled_exception
     app = QApplication(sys.argv)
+    LocalApiCacheRepository.ensure_ready()
 
     load_style(app, team_app.load_theme_mode())
 
