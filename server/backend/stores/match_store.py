@@ -3,27 +3,30 @@ from __future__ import annotations
 from google.cloud import firestore
 
 from .firestore_client import get_client, utcnow_iso
+from .local_cache_store import (
+    CACHE_MISS,
+    MATCH_NAMESPACE,
+    load_cached_json,
+    save_cached_json,
+    touch_cache_namespace,
+)
 
 
 def _match_collection():
-    """경기 원본/요약 문서를 저장하는 컬렉션을 반환한다."""
     return get_client().collection("matches")
 
 
 def _participant_index_collection():
-    """참가자 단위 조회를 빠르게 하기 위한 인덱스 컬렉션을 반환한다."""
     return get_client().collection("match_participants")
 
 
 def _with_id(snapshot: firestore.DocumentSnapshot) -> dict:
-    """Firestore 스냅샷에 문서 ID를 포함한 응답용 dict를 만든다."""
     data = snapshot.to_dict() or {}
     data["id"] = snapshot.id
     return data
 
 
 def get_existing_match_ids(match_ids: list[str]) -> set[str]:
-    """적재 대상 match_id 중 Firestore에 이미 있는 것만 골라낸다."""
     normalized = [match_id.strip() for match_id in match_ids if (match_id or "").strip()]
     if not normalized:
         return set()
@@ -34,7 +37,6 @@ def get_existing_match_ids(match_ids: list[str]) -> set[str]:
 
 
 def store_match_bundle(match_id: str, match_data: dict) -> None:
-    """한 경기의 원본 데이터와 참가자 인덱스를 함께 Firestore에 저장한다."""
     info = match_data.get("info", {})
     metadata = match_data.get("metadata", {})
     teams = info.get("teams", [])
@@ -64,17 +66,16 @@ def store_match_bundle(match_id: str, match_data: dict) -> None:
     }
     _match_collection().document(match_id).set(match_payload)
 
-    # 참가자별 조회 속도를 위해 match_participants 컬렉션에도 요약 인덱스를 만든다.
     batch = get_client().batch()
     for participant in participants:
         participant_payload = _build_participant_index_payload(match_id, participant, match_payload)
         doc_id = f"{match_id}_{participant.get('puuid', '')}"
         batch.set(_participant_index_collection().document(doc_id), participant_payload)
     batch.commit()
+    touch_cache_namespace(MATCH_NAMESPACE)
 
 
 def rebuild_participant_indexes(match_ids: list[str]) -> list[str]:
-    """이미 저장된 matches 문서에서 참가자 인덱스를 다시 만든다."""
     normalized = [match_id.strip() for match_id in match_ids if (match_id or "").strip()]
     if not normalized:
         return []
@@ -112,26 +113,43 @@ def rebuild_participant_indexes(match_ids: list[str]) -> list[str]:
         batch.commit()
         rebuilt_match_ids.append(match_id)
 
+    if rebuilt_match_ids:
+        touch_cache_namespace(MATCH_NAMESPACE)
     return rebuilt_match_ids
 
 
 def get_recent_matches_by_puuid(puuid: str, limit: int) -> list[dict]:
-    """한 사용자의 최근 경기 참가 이력을 PUUID 기준으로 가져온다."""
-    docs = _participant_index_collection().where("puuid", "==", puuid).stream()
+    normalized_puuid = puuid.strip()
+    cache_key = f"matches:recent:puuid:{normalized_puuid}:{int(limit)}"
+    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
+    if cached is not CACHE_MISS:
+        return cached
+
+    docs = _participant_index_collection().where("puuid", "==", normalized_puuid).stream()
     matches = [_with_id(snapshot) for snapshot in docs]
     matches.sort(
         key=lambda match: int(match.get("game_start_timestamp") or 0),
         reverse=True,
     )
-    return matches[:limit]
+    result = matches[:limit]
+    save_cached_json(cache_key, result, MATCH_NAMESPACE)
+    return result
 
 
 def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> list[dict]:
-    """닉네임/태그 조합으로 최근 경기 참가 이력을 조회한다."""
+    normalized_game_name = game_name.strip()
+    normalized_tag_line = tag_line.strip()
+    cache_key = (
+        f"matches:recent:riot_id:{normalized_game_name}:{normalized_tag_line}:{int(limit)}"
+    )
+    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
+    if cached is not CACHE_MISS:
+        return cached
+
     docs = (
         _participant_index_collection()
-        .where("riot_id_game_name", "==", game_name)
-        .where("riot_id_tagline", "==", tag_line)
+        .where("riot_id_game_name", "==", normalized_game_name)
+        .where("riot_id_tagline", "==", normalized_tag_line)
         .stream()
     )
     matches = [_with_id(snapshot) for snapshot in docs]
@@ -139,13 +157,21 @@ def get_recent_matches_by_riot_id(game_name: str, tag_line: str, limit: int) -> 
         key=lambda match: int(match.get("game_start_timestamp") or 0),
         reverse=True,
     )
-    return matches[:limit]
+    result = matches[:limit]
+    save_cached_json(cache_key, result, MATCH_NAMESPACE)
+    return result
 
 
 def get_match_detail(match_id: str) -> dict | None:
-    """저장된 경기 한 건을 팀/참가자 상세까지 포함한 응답 형태로 재구성한다."""
-    snapshot = _match_collection().document(match_id).get()
+    normalized_match_id = match_id.strip()
+    cache_key = f"matches:detail:{normalized_match_id}"
+    cached = load_cached_json(cache_key, MATCH_NAMESPACE)
+    if cached is not CACHE_MISS:
+        return cached
+
+    snapshot = _match_collection().document(normalized_match_id).get()
     if not snapshot.exists:
+        save_cached_json(cache_key, None, MATCH_NAMESPACE)
         return None
 
     data = snapshot.to_dict() or {}
@@ -167,17 +193,21 @@ def get_match_detail(match_id: str) -> dict | None:
         "tournament_code": data.get("tournament_code"),
         "participant_count": data.get("participant_count"),
     }
-    participants = [_participant_detail_from_raw(participant, match_id) for participant in data.get("participants", [])]
-    teams = [_team_detail(team, match_id) for team in data.get("teams", [])]
-    return {
+    participants = [
+        _participant_detail_from_raw(participant, normalized_match_id)
+        for participant in data.get("participants", [])
+    ]
+    teams = [_team_detail(team, normalized_match_id) for team in data.get("teams", [])]
+    detail = {
         "match": summary,
         "teams": teams,
         "participants": participants,
     }
+    save_cached_json(cache_key, detail, MATCH_NAMESPACE)
+    return detail
 
 
 def _build_participant_index_payload(match_id: str, participant: dict, match_payload: dict) -> dict:
-    """참가자 최근 경기 목록 화면에 필요한 최소 필드만 따로 추려 저장한다."""
     challenges = participant.get("challenges", {})
     return {
         "match_id": match_id,
@@ -217,7 +247,6 @@ def _build_participant_index_payload(match_id: str, participant: dict, match_pay
 
 
 def _participant_detail_from_raw(participant: dict, match_id: str) -> dict:
-    """경기 상세 화면에 필요한 참가자 정보를 원본 match 문서에서 펼친다."""
     challenges = participant.get("challenges", {})
     return {
         "match_id": match_id,
@@ -259,7 +288,6 @@ def _participant_detail_from_raw(participant: dict, match_id: str) -> dict:
 
 
 def _team_detail(team: dict, match_id: str) -> dict:
-    """경기 상세 응답에 포함할 팀 단위 요약 정보를 만든다."""
     return {
         "match_id": match_id,
         "team_id": team.get("teamId"),

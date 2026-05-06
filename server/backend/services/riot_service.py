@@ -3,7 +3,7 @@ from ..stores.match_store import (
     rebuild_participant_indexes,
     store_match_bundle,
 )
-from ..clients.riot_api_client import (
+from ..integrations.riot_api import (
     fetch_account,
     fetch_match_detail,
     fetch_match_ids,

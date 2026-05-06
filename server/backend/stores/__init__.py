@@ -15,6 +15,7 @@ from .match_store import (
     store_match_bundle,
 )
 from .riot_account_store import (
+    get_account_by_riot_id,
     get_accounts_by_game_name,
     list_accounts,
     search_accounts_by_game_name,
@@ -34,6 +35,7 @@ __all__ = [
     "clear_collection",
     "delete_documents_by_ids",
     "delete_older_than_days",
+    "get_account_by_riot_id",
     "get_accounts_by_game_name",
     "get_client",
     "get_collection_document",

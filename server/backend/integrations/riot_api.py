@@ -1,6 +1,6 @@
-from urllib.parse import quote
 from threading import Lock
 import time
+from urllib.parse import quote
 
 import requests
 
@@ -18,7 +18,6 @@ _last_request_at = 0.0
 
 
 def riot_error_response(response: requests.Response, default_msg: str) -> dict:
-    """Riot API 오류를 서버 전역에서 쓰는 공통 dict 형태로 맞춘다."""
     try:
         detail = response.json()
     except Exception:
@@ -32,7 +31,6 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
 
 
 def _resolve_api_key() -> str | None:
-    """Riot API 키는 서버 환경 변수에서만 가져온다."""
     return get_riot_api_key()
 
 
@@ -61,7 +59,6 @@ def _parse_retry_after_seconds(response: requests.Response) -> float:
 
 
 def fetch_riot_json(url: str, error_msg: str):
-    """공통 헤더와 예외 처리를 적용해 Riot GET 요청을 한 번 수행한다."""
     resolved_api_key = _resolve_api_key()
     if not resolved_api_key:
         return None, {
@@ -101,16 +98,13 @@ def fetch_riot_json(url: str, error_msg: str):
     if last_response is not None and last_response.status_code == 429:
         payload = riot_error_response(last_response, error_msg)
         payload["error"] = "Riot API rate limit exceeded"
-        payload["hint"] = (
-            "Reduce batch size or match count, wait a little, then retry."
-        )
+        payload["hint"] = "Reduce batch size or match count, wait a little, then retry."
         return None, payload
 
     return None, riot_error_response(last_response, error_msg)
 
 
 def fetch_account(game_name: str, tag_line: str) -> dict:
-    """Riot ID로 계정 기본 정보와 PUUID를 조회한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/riot/account/v1/accounts/by-riot-id/"
         f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
@@ -127,7 +121,6 @@ def fetch_account(game_name: str, tag_line: str) -> dict:
 
 
 def fetch_summoner_by_puuid(puuid: str) -> dict:
-    """티어 조회에 필요한 소환사 정보 payload를 PUUID 기준으로 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/summoner/v4/summoners/by-puuid/"
         f"{quote(puuid, safe='')}"
@@ -148,7 +141,6 @@ def fetch_summoner_by_puuid(puuid: str) -> dict:
 
 
 def fetch_ranked_entries(puuid: str) -> dict:
-    """한 계정의 랭크 큐 엔트리 목록을 가져온다."""
     url = (
         f"{KR_PLATFORM_BASE_URL}/lol/league/v4/entries/by-puuid/"
         f"{quote(puuid, safe='')}"
@@ -164,7 +156,6 @@ def fetch_ranked_entries(puuid: str) -> dict:
 
 
 def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
-    """솔로랭크를 우선하는 규칙으로 대표 랭크 엔트리 한 건을 고른다."""
     if not entries:
         return None
 
@@ -184,7 +175,6 @@ def select_preferred_ranked_entry(entries: list[dict]) -> dict | None:
 
 
 def fetch_match_ids(puuid: str, count: int = 5) -> dict:
-    """한 PUUID의 최근 경기 ID 목록을 가져온다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/by-puuid/"
         f"{quote(puuid, safe='')}/ids?start=0&count={count}"
@@ -196,7 +186,6 @@ def fetch_match_ids(puuid: str, count: int = 5) -> dict:
 
 
 def fetch_match_detail(match_id: str) -> dict:
-    """경기 상세 원본을 읽고 서비스가 바로 쓰기 쉬운 요약 구조로 정리한다."""
     url = (
         f"{ASIA_ROUTING_BASE_URL}/lol/match/v5/matches/"
         f"{quote(match_id, safe='')}"

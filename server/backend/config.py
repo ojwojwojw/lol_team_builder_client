@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 
 
 def get_jwt_secret() -> str | None:
@@ -43,3 +44,11 @@ def get_allowed_origins() -> list[str]:
         return []
 
     return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+
+def get_local_cache_db_path() -> str:
+    raw_path = os.getenv("TEAM_BUILDER_LOCAL_CACHE_DB_PATH", "").strip()
+    if raw_path:
+        return raw_path
+
+    return os.path.join(tempfile.gettempdir(), "team_builder_cache.sqlite3")
