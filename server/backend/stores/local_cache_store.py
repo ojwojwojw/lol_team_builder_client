@@ -143,3 +143,32 @@ def touch_cache_namespace(namespace: str) -> None:
             """,
             (normalized, utcnow_iso()),
         )
+
+
+def get_cache_stats() -> dict:
+    db_path = _cache_db_path()
+    with _connect() as connection:
+        entry_count = connection.execute(
+            "SELECT COUNT(*) FROM cache_entries"
+        ).fetchone()[0]
+        namespace_rows = connection.execute(
+            """
+            SELECT namespace, updated_at
+            FROM namespace_versions
+            ORDER BY namespace ASC
+            """
+        ).fetchall()
+
+    return {
+        "cache_db_path": str(db_path),
+        "cache_db_exists": db_path.exists(),
+        "cache_db_size_bytes": db_path.stat().st_size if db_path.exists() else 0,
+        "entry_count": int(entry_count or 0),
+        "namespaces": [
+            {
+                "namespace": row[0],
+                "updated_at": row[1],
+            }
+            for row in namespace_rows
+        ],
+    }

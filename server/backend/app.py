@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_allowed_origins
 from .controllers.auth_controller import router as auth_router
+from .controllers.cache_admin_controller import router as cache_admin_router
 from .controllers.firestore_admin_controller import router as firestore_admin_router
 from .controllers.match_controller import router as match_router
 from .controllers.riot_controller import router as riot_router
@@ -22,6 +23,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(auth_router)
+    app.include_router(cache_admin_router)
     app.include_router(firestore_admin_router)
     app.include_router(riot_router)
     app.include_router(match_router)

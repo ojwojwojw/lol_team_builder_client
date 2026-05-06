@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import tempfile
+from pathlib import Path
 
 
 def get_jwt_secret() -> str | None:
@@ -51,4 +51,5 @@ def get_local_cache_db_path() -> str:
     if raw_path:
         return raw_path
 
-    return os.path.join(tempfile.gettempdir(), "team_builder_cache.sqlite3")
+    project_root = Path(__file__).resolve().parents[2]
+    return str(project_root / "server" / "data" / "team_builder_cache.sqlite3")
