@@ -1,4 +1,6 @@
 from urllib.parse import quote
+from threading import Lock
+import time
 
 import requests
 
@@ -7,6 +9,12 @@ from ..config import get_riot_api_key
 
 ASIA_ROUTING_BASE_URL = "https://asia.api.riotgames.com"
 KR_PLATFORM_BASE_URL = "https://kr.api.riotgames.com"
+MIN_REQUEST_INTERVAL_SECONDS = 1.2
+MAX_RATE_LIMIT_RETRY_COUNT = 2
+MAX_RETRY_AFTER_SECONDS = 15
+
+_request_lock = Lock()
+_last_request_at = 0.0
 
 
 def riot_error_response(response: requests.Response, default_msg: str) -> dict:
@@ -18,6 +26,7 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
     return {
         "error": default_msg,
         "status": response.status_code,
+        "retry_after": response.headers.get("Retry-After"),
         "riot_response": detail,
     }
 
@@ -25,6 +34,30 @@ def riot_error_response(response: requests.Response, default_msg: str) -> dict:
 def _resolve_api_key() -> str | None:
     """Riot API 키는 서버 환경 변수에서만 가져온다."""
     return get_riot_api_key()
+
+
+def _sleep_for_request_spacing() -> None:
+    global _last_request_at
+
+    with _request_lock:
+        now = time.monotonic()
+        wait_seconds = MIN_REQUEST_INTERVAL_SECONDS - (now - _last_request_at)
+        if wait_seconds > 0:
+            time.sleep(wait_seconds)
+        _last_request_at = time.monotonic()
+
+
+def _parse_retry_after_seconds(response: requests.Response) -> float:
+    raw_value = (response.headers.get("Retry-After") or "").strip()
+    if not raw_value:
+        return 0.0
+
+    try:
+        retry_after = float(raw_value)
+    except ValueError:
+        return 0.0
+
+    return max(0.0, min(retry_after, MAX_RETRY_AFTER_SECONDS))
 
 
 def fetch_riot_json(url: str, error_msg: str):
@@ -41,17 +74,39 @@ def fetch_riot_json(url: str, error_msg: str):
         }
 
     headers = {"X-Riot-Token": resolved_api_key}
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-    except requests.RequestException as exc:
-        return None, {
-            "error": error_msg,
-            "status": 0,
-            "riot_response": str(exc),
-        }
-    if response.status_code != 200:
-        return None, riot_error_response(response, error_msg)
-    return response.json(), None
+    last_response = None
+
+    for attempt in range(MAX_RATE_LIMIT_RETRY_COUNT + 1):
+        _sleep_for_request_spacing()
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+        except requests.RequestException as exc:
+            return None, {
+                "error": error_msg,
+                "status": 0,
+                "riot_response": str(exc),
+            }
+
+        last_response = response
+        if response.status_code == 200:
+            return response.json(), None
+
+        if response.status_code != 429 or attempt >= MAX_RATE_LIMIT_RETRY_COUNT:
+            break
+
+        retry_after_seconds = _parse_retry_after_seconds(response)
+        if retry_after_seconds > 0:
+            time.sleep(retry_after_seconds)
+
+    if last_response is not None and last_response.status_code == 429:
+        payload = riot_error_response(last_response, error_msg)
+        payload["error"] = "Riot API rate limit exceeded"
+        payload["hint"] = (
+            "Reduce batch size or match count, wait a little, then retry."
+        )
+        return None, payload
+
+    return None, riot_error_response(last_response, error_msg)
 
 
 def fetch_account(game_name: str, tag_line: str) -> dict:

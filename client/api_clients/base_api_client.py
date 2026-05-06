@@ -1,4 +1,6 @@
 import json
+import re
+from html import unescape
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -54,14 +56,58 @@ class BaseApiClient:
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 body = response.read().decode("utf-8")
+                content_type = response.headers.get_content_type()
+                if content_type != "application/json":
+                    preview = self._summarize_error_body(body)
+                    raise RuntimeError(
+                        "API server returned a non-JSON response.\n"
+                        f"URL: {request.full_url}\n"
+                        f"Content-Type: {content_type}\n"
+                        f"Body: {preview}"
+                    )
                 return json.loads(body)
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 401:
                 clear_auth_token()
                 save_auth_username("")
-            raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError(
+                self._format_http_error(exc.code, request.full_url, detail)
+            ) from exc
         except URLError as exc:
             raise RuntimeError(
-                f"Cannot connect to API server: {self.base_url}"
+                "API server connection failed.\n"
+                f"Server: {self.base_url}\n"
+                "Check whether the server is running and whether /health responds."
             ) from exc
+
+    def _format_http_error(self, status_code, url, detail):
+        preview = self._summarize_error_body(detail)
+        if status_code == 503:
+            return (
+                "The server is temporarily unavailable (HTTP 503).\n"
+                f"URL: {url}\n"
+                "The API process may still be starting, crashed after deploy, or the "
+                "server address may be pointing at an unavailable service.\n"
+                "Check whether /health returns {\"status\": \"ok\"}, then try again.\n"
+                f"Server response: {preview}"
+            )
+
+        return (
+            f"HTTP {status_code}\n"
+            f"URL: {url}\n"
+            f"Server response: {preview}"
+        )
+
+    def _summarize_error_body(self, body):
+        text = (body or "").strip()
+        if not text:
+            return "(empty response body)"
+
+        if "<html" in text.lower():
+            text = unescape(re.sub(r"<[^>]+>", " ", text))
+
+        text = re.sub(r"\s+", " ", text).strip()
+        if len(text) > 240:
+            return f"{text[:237]}..."
+        return text
