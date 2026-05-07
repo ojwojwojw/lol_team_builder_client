@@ -123,9 +123,11 @@ class UserTableWidget(QWidget):
                 gridline-color: {tokens['table_gridline']};
                 alternate-background-color: {tokens['table_alt_bg']};
                 background-color: {tokens['table_bg']};
+                color: {tokens['input_text']};
             }}
             QTableWidget::item:selected {{
                 background-color: {tokens['table_selected_bg']};
+                color: {tokens['input_text']};
             }}
             """
         )
@@ -453,6 +455,12 @@ class UserTableWidget(QWidget):
                 border: 2px solid {border_color};
                 padding: 2px;
             }}
+            QComboBox QAbstractItemView {{
+                background-color: {tokens['table_bg']};
+                color: {tokens['input_text']};
+                selection-background-color: {tokens['table_selected_bg']};
+                selection-color: {tokens['input_text']};
+            }}
             """
         )
 
@@ -522,6 +530,12 @@ class UserTableWidget(QWidget):
                         border: 2px solid {row_border};
                         padding: 2px;
                     }}
+                    QComboBox QAbstractItemView {{
+                        background-color: {tokens['table_bg']};
+                        color: {tokens['input_text']};
+                        selection-background-color: {tokens['table_selected_bg']};
+                        selection-color: {tokens['input_text']};
+                    }}
                     """
                 )
 
@@ -539,6 +553,12 @@ class UserTableWidget(QWidget):
                             color: {tokens['input_text']};
                             border: 2px solid {row_border};
                             padding: 2px;
+                        }}
+                        QComboBox QAbstractItemView {{
+                            background-color: {tokens['table_bg']};
+                            color: {tokens['input_text']};
+                            selection-background-color: {tokens['table_selected_bg']};
+                            selection-color: {tokens['input_text']};
                         }}
                         """
                     )

@@ -59,4 +59,5 @@ QTableWidget {
 QListWidget::item:selected,
 QTableWidget::item:selected {
     background-color: #dcecff;
+    color: #1f2933;
 }

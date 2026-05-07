@@ -145,6 +145,10 @@ class LocalApiCacheRepository:
                     pass
 
     @staticmethod
+    def invalidate_after_loader_sync() -> None:
+        LocalApiCacheRepository.clear()
+
+    @staticmethod
     def get_stats() -> dict:
         with _CACHE_LOCK:
             try:

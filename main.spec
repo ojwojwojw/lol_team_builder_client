@@ -5,7 +5,7 @@ a = Analysis(
     ['client\\main.py'],
     pathex=['client'],
     binaries=[],
-    datas=[('client/styles', 'styles')],
+    datas=[('client\\styles', 'styles')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -121,6 +121,36 @@ class MainWindow(QWidget):
             f" | {self._format_account_tier_text(account)}"
         )
 
+    def _dedupe_accounts_for_display(self, accounts):
+        sorted_accounts = sorted(
+            accounts or [],
+            key=lambda account: (
+                str((account or {}).get("fetched_at") or ""),
+                str((account or {}).get("id") or ""),
+            ),
+            reverse=True,
+        )
+
+        seen = set()
+        deduped = []
+        for account in sorted_accounts:
+            if not isinstance(account, dict):
+                continue
+
+            game_name = str(account.get("game_name") or "").strip().lower()
+            tag_line = str(account.get("tag_line") or "").strip().lower()
+            if not game_name or not tag_line:
+                deduped.append(account)
+                continue
+
+            key = (game_name, tag_line)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(account)
+
+        return deduped
+
     def _create_ui(self):
         layout = QVBoxLayout()
         splitter = QSplitter(Qt.Horizontal)
@@ -631,7 +661,7 @@ class MainWindow(QWidget):
         self.selected_account_label.setText("선택 계정: -")
         self._clear_match_views()
 
-        accounts = result.get("accounts", [])
+        accounts = self._dedupe_accounts_for_display(result.get("accounts", []))
         for account in accounts:
             label = self._format_account_list_label(account)
             item = QListWidgetItem(label)
@@ -672,7 +702,7 @@ class MainWindow(QWidget):
         self._clear_match_views()
 
         matched_item = None
-        for account in result.get("accounts", []):
+        for account in self._dedupe_accounts_for_display(result.get("accounts", [])):
             label = self._format_account_list_label(account)
             item = QListWidgetItem(label)
             item.setToolTip(label)

@@ -4,9 +4,11 @@ from pathlib import Path
 
 from domain.constants import (
     DEFAULT_BUILD_WEIGHTS,
+    DEFAULT_BUILD_PREFERENCES,
     DEFAULT_SERVER_BASE_URL,
     DEFAULT_THEME_MODE,
     DEFAULT_TIER_SCORE,
+    DEFAULT_CANDIDATE_PRIORITY,
     normalize_theme_mode,
     normalize_tier_name,
 )
@@ -27,6 +29,7 @@ def _default_config():
     return {
         "tier_score": DEFAULT_TIER_SCORE,
         "build_weights": DEFAULT_BUILD_WEIGHTS,
+        "build_preferences": DEFAULT_BUILD_PREFERENCES,
         "server_base_url": DEFAULT_SERVER_BASE_URL,
         "theme_mode": DEFAULT_THEME_MODE,
         "auth_token": "",
@@ -69,6 +72,9 @@ def _load_raw_config():
 
     config["tier_score"] = _normalize_tier_score(config.get("tier_score"))
     config["build_weights"] = _normalize_build_weights(config.get("build_weights"))
+    config["build_preferences"] = _normalize_build_preferences(
+        config.get("build_preferences")
+    )
     config["theme_mode"] = normalize_theme_mode(config.get("theme_mode"))
     return config
 
@@ -85,6 +91,56 @@ def _normalize_build_weights(weight_map):
             normalized[key] = int(value)
         except Exception:
             normalized[key] = default_value
+
+    return normalized
+
+
+def _normalize_build_preferences(preferences):
+    normalized = dict(DEFAULT_BUILD_PREFERENCES)
+
+    if not isinstance(preferences, dict):
+        return normalized
+
+    try:
+        normalized["any_position_penalty"] = max(
+            0,
+            int(
+                preferences.get(
+                    "any_position_penalty",
+                    DEFAULT_BUILD_PREFERENCES["any_position_penalty"],
+                )
+            ),
+        )
+    except Exception:
+        normalized["any_position_penalty"] = DEFAULT_BUILD_PREFERENCES["any_position_penalty"]
+
+    for key in (
+        "priority_penalty_first",
+        "priority_penalty_second",
+        "priority_penalty_third",
+        "max_position_maps_per_team",
+    ):
+        try:
+            value = int(preferences.get(key, DEFAULT_BUILD_PREFERENCES[key]))
+        except Exception:
+            value = DEFAULT_BUILD_PREFERENCES[key]
+
+        if key == "max_position_maps_per_team":
+            normalized[key] = max(1, value)
+        else:
+            normalized[key] = max(0, value)
+
+    raw_priority = preferences.get("candidate_priority", DEFAULT_CANDIDATE_PRIORITY)
+    if isinstance(raw_priority, list):
+        unique_keys = []
+        for key in raw_priority:
+            if key not in DEFAULT_CANDIDATE_PRIORITY:
+                continue
+            if key in unique_keys:
+                continue
+            unique_keys.append(key)
+        if len(unique_keys) == len(DEFAULT_CANDIDATE_PRIORITY):
+            normalized["candidate_priority"] = unique_keys
 
     return normalized
 
@@ -153,6 +209,16 @@ def load_build_weights():
 def save_build_weights(weight_map):
     config = _load_raw_config()
     config["build_weights"] = _normalize_build_weights(weight_map)
+    _save_raw_config(config)
+
+
+def load_build_preferences():
+    return _load_raw_config().get("build_preferences", DEFAULT_BUILD_PREFERENCES)
+
+
+def save_build_preferences(preferences):
+    config = _load_raw_config()
+    config["build_preferences"] = _normalize_build_preferences(preferences)
     _save_raw_config(config)
 
 

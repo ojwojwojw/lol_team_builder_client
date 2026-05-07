@@ -225,7 +225,7 @@ class RiotLoaderWidget(QWidget):
         text = self.api.format_response_text(response, data)
         self.result_box.setText(text)
         if response.status_code == 401:
-            self.status_label.setText("Authentication expired. Please sign in again.")
+            self.status_label.setText("로그인 세션이 만료되었습니다. 다시 로그인해주세요.")
         elif response.status_code == 403:
             self.status_label.setText("Admin permission is required for this action.")
         elif response.ok:
@@ -306,6 +306,8 @@ class RiotLoaderWidget(QWidget):
 
         try:
             response, data = self.api.store_recent_matches(game_name, tag_line, count)
+            if response.ok:
+                LocalApiCacheRepository.invalidate_after_loader_sync()
             self._show_response(response, data)
         except Exception as exc:
             self._set_message(f"Request error: {exc}")
@@ -400,6 +402,8 @@ class RiotLoaderWidget(QWidget):
 
         try:
             response, data = self.api.store_selected_accounts(count, accounts)
+            if response.ok:
+                LocalApiCacheRepository.invalidate_after_loader_sync()
             self._show_response(response, data)
         except Exception as exc:
             self._set_message(f"Request error: {exc}")
@@ -414,6 +418,8 @@ class RiotLoaderWidget(QWidget):
 
         try:
             response, data = self.api.refresh_selected_tiers(accounts)
+            if response.ok:
+                LocalApiCacheRepository.invalidate_after_loader_sync()
             self._show_response(response, data)
             if response.status_code == 200:
                 self.load_all_stored_accounts()
@@ -487,8 +493,7 @@ def ensure_admin_session(parent=None):
             team_app.clear_auth_token()
             team_app.save_auth_username("")
             session_notice = (
-                "The saved session expired or is no longer valid on the current server. "
-                "Please sign in again."
+                "로그인 세션이 만료되었습니다. 다시 로그인해주세요."
             )
 
     if session_notice:

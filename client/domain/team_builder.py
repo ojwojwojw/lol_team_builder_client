@@ -5,6 +5,8 @@ from pathlib import Path
 
 from domain.constants import (
     ANY_POSITION,
+    BUILD_WEIGHT_LABELS,
+    DEFAULT_BUILD_PREFERENCES,
     DEFAULT_BUILD_WEIGHTS,
     DEFAULT_TIER_SCORE,
     POSITIONS,
@@ -16,7 +18,6 @@ CLIENT_ROOT = Path(__file__).resolve().parents[1]
 
 # 한 팀에서 포지션 배치를 전부 탐색하면 경우의 수가 빠르게 커지므로,
 # 우선순위가 좋은 배치만 상위 N개로 잘라서 조합 탐색량을 줄인다.
-MAX_POSITION_MAPS_PER_TEAM = 80
 RELAXED_POSITION_PENALTY = len(POSITIONS) + 2
 ADC_POSITION = POSITIONS[3]
 SUPPORT_POSITION = POSITIONS[4]
@@ -213,15 +214,42 @@ def get_position_priority_penalty(user, position):
     return PRIORITY_PENALTY_MAP.get(index, 30)
 
 
-def get_relaxed_position_priority_penalty(user, position):
+def get_configurable_position_priority_penalty(user, position, build_preferences=None):
+    if build_preferences is None:
+        return get_position_priority_penalty(user, position)
+
+    positions = normalize_positions(user)
+    concrete_positions = [
+        pos for pos in positions
+        if pos != ANY_POSITION
+    ]
+
+    if position not in concrete_positions:
+        return None
+
+    priority_penalty_map = {
+        0: int(build_preferences.get("priority_penalty_first", DEFAULT_BUILD_PREFERENCES["priority_penalty_first"])),
+        1: int(build_preferences.get("priority_penalty_second", DEFAULT_BUILD_PREFERENCES["priority_penalty_second"])),
+        2: int(build_preferences.get("priority_penalty_third", DEFAULT_BUILD_PREFERENCES["priority_penalty_third"])),
+    }
+
+    index = concrete_positions.index(position)
+    return priority_penalty_map.get(index, 30)
+
+
+def get_relaxed_position_priority_penalty(user, position, build_preferences=None):
     """완화 모드에서 포지션이 없더라도 강제로 배정할 수 있게 페널티를 준다."""
-    penalty = get_position_priority_penalty(user, position)
+    penalty = get_configurable_position_priority_penalty(user, position, build_preferences)
 
     if penalty is not None:
         return penalty
 
     positions = normalize_positions(user)
-    return max(len(positions), 1) + RELAXED_POSITION_PENALTY
+    preferences = build_preferences or DEFAULT_BUILD_PREFERENCES
+    any_position_penalty = int(
+        preferences.get("any_position_penalty", DEFAULT_BUILD_PREFERENCES["any_position_penalty"])
+    )
+    return max(len(positions), 1) + any_position_penalty
 
 
 def _position_map_sort_key(position_map):
@@ -311,7 +339,7 @@ def _prepare_user(user, index, tier_score):
     return prepared
 
 
-def _generate_position_maps(team, relaxed=False):
+def _generate_position_maps(team, relaxed=False, build_preferences=None):
     """한 팀에 대해 가능한 포지션 배치 후보를 생성한다."""
     maps = []
 
@@ -323,9 +351,9 @@ def _generate_position_maps(team, relaxed=False):
 
         for position, user in zip(POSITIONS, permutation):
             penalty = (
-                get_relaxed_position_priority_penalty(user, position)
+                get_relaxed_position_priority_penalty(user, position, build_preferences)
                 if relaxed
-                else get_position_priority_penalty(user, position)
+                else get_configurable_position_priority_penalty(user, position, build_preferences)
             )
 
             if penalty is None:
@@ -352,7 +380,13 @@ def _generate_position_maps(team, relaxed=False):
         })
 
     maps.sort(key=_position_map_sort_key)
-    return maps[:MAX_POSITION_MAPS_PER_TEAM]
+    max_position_maps = int(
+        (build_preferences or DEFAULT_BUILD_PREFERENCES).get(
+            "max_position_maps_per_team",
+            DEFAULT_BUILD_PREFERENCES["max_position_maps_per_team"],
+        )
+    )
+    return maps[:max(1, max_position_maps)]
 
 
 def generate_position_maps(team):
@@ -363,6 +397,145 @@ def generate_position_maps(team):
 def generate_relaxed_position_maps(team):
     """완화 모드 포지션 배치 후보를 생성한다."""
     return _generate_position_maps(team, relaxed=True)
+
+
+def get_position_priority_penalty(user, position):
+    positions = normalize_positions(user)
+    concrete_positions = [pos for pos in positions if pos != ANY_POSITION]
+
+    if position not in concrete_positions:
+        return None
+
+    priority_penalty_map = {
+        0: DEFAULT_BUILD_PREFERENCES["priority_penalty_first"],
+        1: DEFAULT_BUILD_PREFERENCES["priority_penalty_second"],
+        2: DEFAULT_BUILD_PREFERENCES["priority_penalty_third"],
+    }
+    index = concrete_positions.index(position)
+    return priority_penalty_map.get(index, 30)
+
+
+def _position_map_sort_key(position_map):
+    return (
+        position_map["position_penalty"],
+        position_map["bottom_penalty"],
+        position_map["line_power_spread"],
+    )
+
+
+def _position_map_balance_key(position_map):
+    return (
+        position_map["line_power_spread"],
+        position_map["bottom_penalty"],
+        position_map["position_penalty"],
+    )
+
+
+def _position_map_bottom_key(position_map):
+    return (
+        position_map["bottom_penalty"],
+        position_map["position_penalty"],
+        position_map["line_power_spread"],
+    )
+
+
+def _trim_position_maps(maps, max_position_maps):
+    if len(maps) <= max_position_maps:
+        return maps
+
+    target_size = max(1, max_position_maps)
+    sorters = (
+        _position_map_sort_key,
+        _position_map_balance_key,
+        _position_map_bottom_key,
+    )
+    per_sorter = max(1, target_size // len(sorters))
+    selected = []
+    selected_signatures = set()
+
+    for key_fn in sorters:
+        picked = 0
+        for position_map in sorted(maps, key=key_fn):
+            signature = tuple(
+                position_map["map"][position]["_build_id"]
+                for position in POSITIONS
+            )
+            if signature in selected_signatures:
+                continue
+            selected.append(position_map)
+            selected_signatures.add(signature)
+            picked += 1
+            if picked >= per_sorter or len(selected) >= target_size:
+                break
+
+    if len(selected) < target_size:
+        for position_map in sorted(maps, key=_position_map_sort_key):
+            signature = tuple(
+                position_map["map"][position]["_build_id"]
+                for position in POSITIONS
+            )
+            if signature in selected_signatures:
+                continue
+            selected.append(position_map)
+            selected_signatures.add(signature)
+            if len(selected) >= target_size:
+                break
+
+    return sorted(selected, key=_position_map_sort_key)[:target_size]
+
+
+def _generate_position_maps(team, relaxed=False, build_preferences=None):
+    maps = []
+
+    for permutation in itertools.permutations(team, len(POSITIONS)):
+        mapping = {}
+        line_power_vector = []
+        position_penalty = 0
+        valid = True
+
+        for position, user in zip(POSITIONS, permutation):
+            penalty = (
+                get_relaxed_position_priority_penalty(user, position, build_preferences)
+                if relaxed
+                else get_configurable_position_priority_penalty(
+                    user, position, build_preferences
+                )
+            )
+
+            if penalty is None:
+                valid = False
+                break
+
+            mapping[position] = user
+            line_power_vector.append(user["_line_power_by_position"][position])
+            position_penalty += penalty
+
+        if not valid:
+            continue
+
+        bottom_penalty = abs(
+            mapping[ADC_POSITION]["_line_power_by_position"][ADC_POSITION]
+            - mapping[SUPPORT_POSITION]["_line_power_by_position"][SUPPORT_POSITION]
+        )
+        line_power_spread = max(line_power_vector) - min(line_power_vector)
+
+        maps.append(
+            {
+                "map": mapping,
+                "position_penalty": position_penalty,
+                "line_power_vector": tuple(line_power_vector),
+                "bottom_penalty": bottom_penalty,
+                "line_power_spread": line_power_spread,
+            }
+        )
+
+    max_position_maps = int(
+        (build_preferences or DEFAULT_BUILD_PREFERENCES).get(
+            "max_position_maps_per_team",
+            DEFAULT_BUILD_PREFERENCES["max_position_maps_per_team"],
+        )
+    )
+    return _trim_position_maps(maps, max_position_maps)
 
 
 def get_line_limit(position):
@@ -573,11 +746,23 @@ def _get_team_cache_key(team):
     return tuple(sorted(user["_build_id"] for user in team))
 
 
-def _get_position_maps_for_team(team, relaxed, position_map_cache):
+def _get_position_maps_for_team(team, relaxed, position_map_cache, build_preferences):
     """같은 팀 구성에 대한 포지션 배치 후보를 캐시에서 재사용한다."""
-    cache_key = (relaxed, _get_team_cache_key(team))
+    cache_key = (
+        relaxed,
+        _get_team_cache_key(team),
+        int(build_preferences.get("any_position_penalty", DEFAULT_BUILD_PREFERENCES["any_position_penalty"])),
+        int(build_preferences.get("priority_penalty_first", DEFAULT_BUILD_PREFERENCES["priority_penalty_first"])),
+        int(build_preferences.get("priority_penalty_second", DEFAULT_BUILD_PREFERENCES["priority_penalty_second"])),
+        int(build_preferences.get("priority_penalty_third", DEFAULT_BUILD_PREFERENCES["priority_penalty_third"])),
+        int(build_preferences.get("max_position_maps_per_team", DEFAULT_BUILD_PREFERENCES["max_position_maps_per_team"])),
+    )
     if cache_key not in position_map_cache:
-        position_map_cache[cache_key] = _generate_position_maps(team, relaxed=relaxed)
+        position_map_cache[cache_key] = _generate_position_maps(
+            team,
+            relaxed=relaxed,
+            build_preferences=build_preferences,
+        )
     return position_map_cache[cache_key]
 
 
@@ -589,6 +774,7 @@ def _build_candidate(
     team1_score,
     team2_score,
     build_weights,
+    build_preferences,
 ):
     """한 쌍의 포지션 배치 후보를 최종 평가용 candidate로 만든다."""
     line_metrics = _build_line_metrics(team1_case, team2_case)
@@ -627,14 +813,11 @@ def _build_candidate(
     }
 
     ## 여기 우선순위에 따라 가장 먼저 띄울 조합이 달라진다.
-    candidate_key = (
-        candidate["warning_count"],
-        candidate["position_penalty"],
-        candidate["adc_line_diff"],
-        candidate["max_line_diff"],
-        candidate["mismatch_severity"],
-        candidate["final_score"],
+    candidate_priority = build_preferences.get(
+        "candidate_priority",
+        DEFAULT_BUILD_PREFERENCES["candidate_priority"],
     )
+    candidate_key = tuple(candidate[key] for key in candidate_priority)
 
     return candidate, candidate_key
 
@@ -700,7 +883,7 @@ def _build_score_breakdown_rows(candidate, build_weights):
     return rows
 
 
-def _build_team_candidates(users, tier_score, build_weights, relaxed=False):
+def _build_team_candidates(users, tier_score, build_weights, build_preferences, relaxed=False):
     """10명 중 가능한 5:5 팀 후보를 탐색해 최상위 결과만 남긴다."""
     best_candidates = []
     best_key = None
@@ -716,8 +899,8 @@ def _build_team_candidates(users, tier_score, build_weights, relaxed=False):
         team1 = [users[index] for index in team1_indexes]
         team2 = [users[index] for index in team2_indexes]
 
-        team1_maps = _get_position_maps_for_team(team1, relaxed, position_map_cache)
-        team2_maps = _get_position_maps_for_team(team2, relaxed, position_map_cache)
+        team1_maps = _get_position_maps_for_team(team1, relaxed, position_map_cache, build_preferences)
+        team2_maps = _get_position_maps_for_team(team2, relaxed, position_map_cache, build_preferences)
 
         if not team1_maps or not team2_maps:
             continue
@@ -735,6 +918,7 @@ def _build_team_candidates(users, tier_score, build_weights, relaxed=False):
                     team1_score,
                     team2_score,
                     build_weights,
+                    build_preferences,
                 )
 
                 if best_key is None or candidate_key < best_key:
@@ -797,12 +981,14 @@ def build_team_score_tooltip(team_map, tier_score):
     return "\n".join(lines)
 
 
-def build_best_teams(users, tier_score=None, build_weights=None):
+def build_best_teams(users, tier_score=None, build_weights=None, build_preferences=None):
     """10명의 유저를 받아 가장 밸런스가 좋은 5:5 조합을 반환한다."""
     if tier_score is None:
         tier_score = load_config()
     if build_weights is None:
         build_weights = dict(DEFAULT_BUILD_WEIGHTS)
+    if build_preferences is None:
+        build_preferences = dict(DEFAULT_BUILD_PREFERENCES)
 
     if len(users) != 10:
         raise Exception("5:5 팀 생성을 위해 선택된 유저는 반드시 10명이어야 합니다.")
@@ -816,6 +1002,7 @@ def build_best_teams(users, tier_score=None, build_weights=None):
         prepared_users,
         tier_score,
         build_weights,
+        build_preferences,
         relaxed=False,
     )
     used_relaxed_rules = False
@@ -825,6 +1012,7 @@ def build_best_teams(users, tier_score=None, build_weights=None):
             prepared_users,
             tier_score,
             build_weights,
+            build_preferences,
             relaxed=True,
         )
         used_relaxed_rules = True

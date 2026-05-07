@@ -45,6 +45,42 @@ DEFAULT_BUILD_WEIGHTS = {
     "couple_group_penalty": 12,
 }
 
+BUILD_WEIGHT_LABELS = {
+    "team_diff": "팀 총점 차이 민감도",
+    "line_diff_total": "라인 밸런스 민감도",
+    "position_penalty": "선호 포지션 불일치 민감도",
+    "bottom_penalty": "봇 듀오 격차 민감도",
+    "team_form_diff": "최근 폼 차이 민감도",
+    "couple_group_penalty": "커플 분리 회피 민감도",
+}
+
+DEFAULT_CANDIDATE_PRIORITY = [
+    "warning_count",
+    "position_penalty",
+    "adc_line_diff",
+    "max_line_diff",
+    "mismatch_severity",
+    "final_score",
+]
+
+CANDIDATE_PRIORITY_LABELS = {
+    "warning_count": "라인 경고 수",
+    "position_penalty": "선호 포지션 불일치",
+    "adc_line_diff": "원딜 라인 격차",
+    "max_line_diff": "가장 큰 라인 격차",
+    "mismatch_severity": "라인 불균형 누적치",
+    "final_score": "최종 점수",
+}
+
+DEFAULT_BUILD_PREFERENCES = {
+    "any_position_penalty": 7,
+    "priority_penalty_first": 0,
+    "priority_penalty_second": 6,
+    "priority_penalty_third": 15,
+    "max_position_maps_per_team": 80,
+    "candidate_priority": DEFAULT_CANDIDATE_PRIORITY,
+}
+
 DEFAULT_SERVER_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_THEME_MODE = "dark"
 ACCOUNT_SEARCH_LIMIT = 1000

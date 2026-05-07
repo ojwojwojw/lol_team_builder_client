@@ -1,6 +1,10 @@
 from domain.team_builder import build_best_teams
 from domain.constants import DEFAULT_TIER_SCORE
-from repositories.dataset_repository import load_build_weights, load_config
+from repositories.dataset_repository import (
+    load_build_preferences,
+    load_build_weights,
+    load_config,
+)
 
 
 def build_teams(selected_users):
@@ -24,9 +28,15 @@ def build_teams(selected_users):
     selected = selected_users[:10]
     tier_score = load_config()
     build_weights = load_build_weights()
+    build_preferences = load_build_preferences()
 
     try:
-        result = build_best_teams(selected, tier_score, build_weights)
+        result = build_best_teams(
+            selected,
+            tier_score,
+            build_weights,
+            build_preferences,
+        )
     except Exception as exc:
         return None, str(exc)
 
