@@ -26,6 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from application.team_app import team_app
+from core.auth_session import clear_saved_session
 from repositories.local_api_cache_repository import LocalApiCacheRepository
 from tools.riot_loader_api import RiotLoaderApi
 from ui.dialogs.login_dialog import LoginDialog
@@ -449,8 +450,7 @@ class RiotLoaderWidget(QWidget):
             return
 
         self._close_aux_dialogs()
-        team_app.clear_auth_token()
-        team_app.save_auth_username("")
+        clear_saved_session()
         self.current_user = {}
         self.current_puuid = ""
         self.current_match_ids = []
@@ -478,8 +478,7 @@ def ensure_admin_session(parent=None):
             current_user = team_app.get_current_user()
             if current_user.get("is_admin"):
                 return current_user
-            team_app.clear_auth_token()
-            team_app.save_auth_username("")
+            clear_saved_session()
             session_notice = (
                 "The saved session is still present but the current server no longer "
                 "accepts it as an admin session. Please sign in again."
@@ -490,8 +489,7 @@ def ensure_admin_session(parent=None):
                 "This tool can only be used with an admin account.",
             )
         except Exception:
-            team_app.clear_auth_token()
-            team_app.save_auth_username("")
+            clear_saved_session()
             session_notice = (
                 "로그인 세션이 만료되었습니다. 다시 로그인해주세요."
             )
@@ -507,8 +505,7 @@ def ensure_admin_session(parent=None):
         if current_user.get("is_admin"):
             return current_user
 
-        team_app.clear_auth_token()
-        team_app.save_auth_username("")
+        clear_saved_session()
         QMessageBox.warning(
             parent,
             "Admin Permission Required",

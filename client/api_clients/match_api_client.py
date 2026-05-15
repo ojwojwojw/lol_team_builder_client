@@ -1,6 +1,7 @@
 from urllib.parse import quote
 
 from api_clients.base_api_client import BaseApiClient
+from core.account_records import dedupe_accounts
 from repositories.local_api_cache_repository import LocalApiCacheRepository
 
 
@@ -22,35 +23,9 @@ class MatchApiClient(BaseApiClient):
         if not isinstance(accounts, list):
             return payload
 
-        sorted_accounts = sorted(
-            accounts,
-            key=lambda account: (
-                str((account or {}).get("fetched_at") or ""),
-                str((account or {}).get("id") or ""),
-            ),
-            reverse=True,
-        )
-
-        latest_by_riot_id = {}
-        deduped = []
-        for account in sorted_accounts:
-            if not isinstance(account, dict):
-                continue
-            game_name = str(account.get("game_name") or "").strip().lower()
-            tag_line = str(account.get("tag_line") or "").strip().lower()
-            if not game_name or not tag_line:
-                deduped.append(account)
-                continue
-
-            key = (game_name, tag_line)
-            if key in latest_by_riot_id:
-                continue
-            latest_by_riot_id[key] = True
-            deduped.append(account)
-
         normalized = dict(payload)
-        normalized["accounts"] = deduped
-        normalized["count"] = len(deduped)
+        normalized["accounts"] = dedupe_accounts(accounts)
+        normalized["count"] = len(normalized["accounts"])
         return normalized
 
     def list_accounts(self, limit=20):

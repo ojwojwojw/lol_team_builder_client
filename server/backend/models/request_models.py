@@ -69,17 +69,3 @@ class CreateUserRequest(BaseModel):
 
     username: str
     password: str
-
-
-class FirestoreDeleteDocumentsRequest(BaseModel):
-    """Input body for deleting selected Firestore documents by ID."""
-
-    collection: str
-    document_ids: list[str]
-
-
-class FirestoreDeleteOlderThanRequest(BaseModel):
-    """Input body for deleting Firestore documents older than a day range."""
-
-    collection: str
-    days: int

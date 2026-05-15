@@ -5,12 +5,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from repositories.dataset_repository import (
-    clear_auth_token,
-    load_auth_token,
-    load_server_base_url,
-    save_auth_username,
-)
+from core.auth_session import build_auth_headers, clear_saved_session
+from repositories.dataset_repository import load_server_base_url
 
 class BaseApiClient:
     """Shared HTTP client for FastAPI requests."""
@@ -41,16 +37,9 @@ class BaseApiClient:
         return self._send(request)
 
     def _build_headers(self, use_auth=True, include_json=False):
-        headers = {}
-        if include_json:
-            headers["Content-Type"] = "application/json"
-
-        if use_auth:
-            token = load_auth_token().strip()
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
-
-        return headers
+        if not use_auth:
+            return {"Content-Type": "application/json"} if include_json else {}
+        return build_auth_headers(include_json=include_json)
 
     def _send(self, request):
         try:
@@ -69,8 +58,7 @@ class BaseApiClient:
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 401:
-                clear_auth_token()
-                save_auth_username("")
+                clear_saved_session()
             raise RuntimeError(
                 self._format_http_error(exc.code, request.full_url, detail)
             ) from exc

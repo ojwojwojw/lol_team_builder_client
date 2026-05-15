@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 
 from application.team_app import team_app
+from core.auth_session import clear_saved_session, save_login_session
 
 
 class LoginDialog(QDialog):
@@ -103,8 +104,7 @@ class LoginDialog(QDialog):
 
     def reset_saved_session(self):
         """로컬에 저장된 로그인 토큰과 사용자명을 명시적으로 초기화한다."""
-        team_app.clear_auth_token()
-        team_app.save_auth_username("")
+        clear_saved_session()
         self.username_input.clear()
         self.password_input.clear()
         self.show_session_notice(
@@ -168,7 +168,6 @@ class LoginDialog(QDialog):
         if not token:
             raise RuntimeError("로그인 응답에 access_token 이 없습니다.")
 
-        team_app.save_auth_token(token)
-        team_app.save_auth_username(username)
+        save_login_session(token, username)
         self.current_user = result.get("user")
         self.accept()

@@ -36,6 +36,7 @@ from application.recent_match_views import (
     build_recent_summary_text,
 )
 from application.team_app import team_app
+from core.account_records import dedupe_accounts
 from domain.constants import ACCOUNT_SEARCH_LIMIT, ANY_POSITION
 from ui.dialogs.auth_admin_dialog import AuthAdminDialog
 from ui.dialogs.config_dialog import ConfigDialog
@@ -122,34 +123,7 @@ class MainWindow(QWidget):
         )
 
     def _dedupe_accounts_for_display(self, accounts):
-        sorted_accounts = sorted(
-            accounts or [],
-            key=lambda account: (
-                str((account or {}).get("fetched_at") or ""),
-                str((account or {}).get("id") or ""),
-            ),
-            reverse=True,
-        )
-
-        seen = set()
-        deduped = []
-        for account in sorted_accounts:
-            if not isinstance(account, dict):
-                continue
-
-            game_name = str(account.get("game_name") or "").strip().lower()
-            tag_line = str(account.get("tag_line") or "").strip().lower()
-            if not game_name or not tag_line:
-                deduped.append(account)
-                continue
-
-            key = (game_name, tag_line)
-            if key in seen:
-                continue
-            seen.add(key)
-            deduped.append(account)
-
-        return deduped
+        return dedupe_accounts(accounts)
 
     def _create_ui(self):
         layout = QVBoxLayout()

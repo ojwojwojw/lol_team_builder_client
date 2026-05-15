@@ -5,9 +5,9 @@ from urllib.parse import urlencode
 
 import requests
 
+from core.auth_session import build_auth_headers, clear_saved_session
 from domain.constants import ACCOUNT_SEARCH_LIMIT
 from repositories.dataset_repository import load_server_base_url
-from application.team_app import team_app
 
 
 class RiotLoaderApi:
@@ -30,11 +30,7 @@ class RiotLoaderApi:
         )
 
     def auth_headers(self):
-        token = team_app.load_auth_token().strip()
-        headers = {"Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        return headers
+        return build_auth_headers(include_accept=True)
 
     def request(self, method, url, *, payload=None, timeout=30):
         response = requests.request(
@@ -46,8 +42,7 @@ class RiotLoaderApi:
         )
         data = self.parse_json_response(response)
         if response.status_code == 401:
-            team_app.clear_auth_token()
-            team_app.save_auth_username("")
+            clear_saved_session()
         return response, data
 
     def parse_json_response(self, response):
